@@ -1,0 +1,766 @@
+/* ═══════════════════════════════════════════════════════════════════
+   NextGen Europa — Native Dark Glass Design System
+   Inspired by macOS Ventura / iOS 17 Weather App
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Design Tokens ────────────────────────────────────────────────── */
+:root {
+    /* Midnight Palette */
+    --midnight-base: #0A0F1E;
+    --midnight-depth: #0F172A;
+    --midnight-surface: rgba(15, 23, 42, 0.55);
+    --midnight-elevated: rgba(30, 41, 59, 0.5);
+
+    /* Glass System - Physical Realism */
+    --glass-bg: rgba(255, 255, 255, 0.02);
+    --glass-bg-hover: rgba(255, 255, 255, 0.04);
+    --glass-border-subtle: rgba(255, 255, 255, 0.04);
+    --glass-border-specular: rgba(255, 255, 255, 0.2);
+    --glass-highlight: rgba(255, 255, 255, 0.03);
+    --glass-blur: 24px;
+
+    /* Accent: Cobalt Blue */
+    --brand-accent: #3B82F6;
+    --brand-accent-hover: #60A5FA;
+    --brand-dim: rgba(59, 130, 246, 0.12);
+    --brand-glow: rgba(59, 130, 246, 0.25);
+
+    /* Shadows (Deep, layered, volumetric) */
+    --shadow-flat: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-elite: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 0 var(--glass-border-specular);
+    --shadow-floating: 0 30px 60px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    --shadow-glow: 0 0 40px var(--brand-glow), 0 0 80px rgba(59, 130, 246, 0.08);
+}
+
+/* ── Base ──────────────────────────────────────────────────────────── */
+html {
+    background-color: var(--midnight-base);
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+    background-color: var(--midnight-base);
+    color: rgba(255, 255, 255, 0.9);
+    min-height: 100vh;
+    letter-spacing: -0.01em;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transition: color 0.8s ease;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+    overflow-x: hidden;
+}
+
+/* ── Mesh Gradient Background ─────────────────────────────────────── */
+#mesh-bg {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(ellipse 80% 60% at 20% 30%, rgba(59, 130, 246, 0.08) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 80% at 80% 70%, rgba(124, 58, 237, 0.06) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 40% at 50% 50%, rgba(6, 182, 212, 0.04) 0%, transparent 50%);
+    animation: mesh-shift 20s ease-in-out infinite alternate;
+    will-change: transform;
+    transition: transform 0.3s ease-out;
+}
+
+@keyframes mesh-shift {
+    0% {
+        transform: scale(1) translate(0, 0);
+    }
+
+    33% {
+        transform: scale(1.05) translate(-2%, 1%);
+    }
+
+    66% {
+        transform: scale(1.02) translate(1%, -1%);
+    }
+
+    100% {
+        transform: scale(1) translate(0, 0);
+    }
+}
+
+/* ── Scrollbar (macOS native feel) ────────────────────────────────── */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+/* ── Custom Animations ────────────────────────────────────────────── */
+@keyframes eq {
+    0% {
+        height: 20%;
+    }
+
+    100% {
+        height: 100%;
+    }
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    transition: background 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+/* ── Typography (Editorial / Native) ──────────────────────────────── */
+h1,
+h2,
+h3,
+.font-serif {
+    font-family: 'Playfair Display', 'Georgia', serif;
+    font-weight: 400;
+    letter-spacing: -0.03em;
+}
+
+strong.font-serif,
+h1.font-bold {
+    font-weight: 700;
+    letter-spacing: -0.04em;
+}
+
+/* Temperature display — ultra editorial */
+.temp-display {
+    font-family: 'Inter', sans-serif;
+    font-weight: 200;
+    letter-spacing: -0.06em;
+    line-height: 0.85;
+}
+
+/* ── Leaflet Theme Overrides (Ultra-Realistic) ────────────────────── */
+.leaflet-container {
+    background: transparent !important;
+    font-family: 'Inter', sans-serif;
+}
+
+/* Esconder atribución blanca por defecto que rompe la inmersión */
+.leaflet-control-attribution {
+    display: none !important;
+}
+
+/* ── Glass Panel (Core Component) ─────────────────────────────────── */
+.glass-panel {
+    background: var(--glass-bg);
+    /* Frosted texture overlay using internal procedural SVG */
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E");
+    backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+
+    /* Physical Border Re-fraction (Specular Top, Subtle Bottom) */
+    border: 1px solid var(--glass-border-subtle);
+    border-top: 1px solid var(--glass-border-specular);
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+
+    border-radius: 1.5rem;
+    box-shadow: var(--shadow-elite);
+    position: relative;
+    overflow: hidden;
+    transition: all 0.5s cubic-bezier(0.2, 1, 0.2, 1);
+}
+
+/* Ambient inner glow */
+.glass-panel::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: inset 0 0 30px rgba(255, 255, 255, 0.01);
+    pointer-events: none;
+    z-index: 1;
+}
+
+.glass-panel::after {
+    display: none;
+}
+
+.glass-panel:hover {
+    border-color: rgba(255, 255, 255, 0.08);
+    border-top-color: rgba(255, 255, 255, 0.3);
+    box-shadow: var(--shadow-floating);
+    background-color: var(--glass-bg-hover);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   HERO SECTION
+   ═══════════════════════════════════════════════════════════════════ */
+#hero-section {
+    contain: layout paint;
+}
+
+.hero-subtitle {
+    letter-spacing: 0.4em;
+    font-weight: 300;
+    text-shadow: 0 0 30px rgba(59, 130, 246, 0.3);
+}
+
+.hero-ui {
+    backdrop-filter: blur(24px) saturate(200%);
+    -webkit-backdrop-filter: blur(24px) saturate(200%);
+    background: rgba(15, 23, 42, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: var(--shadow-floating);
+    transition: all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.hero-ui:hover {
+    transform: translateY(-4px);
+    background: rgba(15, 23, 42, 0.65);
+    border-color: rgba(59, 130, 246, 0.3);
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(59, 130, 246, 0.15);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   BUTTONS
+   ═══════════════════════════════════════════════════════════════════ */
+.glass-btn-icon {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.7);
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.glass-btn-icon:hover {
+    background: var(--brand-accent);
+    color: white;
+    transform: scale(1.08);
+    box-shadow: 0 8px 24px var(--brand-glow);
+}
+
+/* Primary Button — Luxury with Glow */
+.btn-luxury {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.9);
+    padding: 1.2rem 3rem;
+    border-radius: 16px;
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    font-size: 0.8125rem;
+    position: relative;
+    overflow: hidden;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    transition: all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+    cursor: pointer;
+}
+
+.btn-luxury::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.1), transparent);
+    transform: translateX(-100%);
+    transition: transform 0.8s ease;
+}
+
+.btn-luxury:hover {
+    transform: translateY(-3px) scale(1.03);
+    border-color: rgba(59, 130, 246, 0.4);
+    box-shadow:
+        0 0 30px rgba(59, 130, 246, 0.25),
+        0 15px 40px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    background: rgba(59, 130, 246, 0.1);
+}
+
+.btn-luxury:hover::before {
+    transform: translateX(100%);
+}
+
+.btn-luxury-outline {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: rgba(255, 255, 255, 0.8);
+    padding: 1rem 2.5rem;
+    border-radius: 14px;
+    font-weight: 600;
+    font-size: 0.8125rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+    cursor: pointer;
+}
+
+.btn-luxury-outline:hover {
+    background: var(--brand-accent);
+    color: white;
+    border-color: var(--brand-accent);
+    box-shadow: 0 8px 30px var(--brand-glow);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PRELOADER
+   ═══════════════════════════════════════════════════════════════════ */
+#luxury-preloader {
+    position: fixed;
+    inset: 0;
+    background-color: var(--midnight-base);
+    z-index: 99999;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    transition: opacity 1.2s cubic-bezier(0.7, 0, 0.3, 1), visibility 1.2s;
+}
+
+.loader-brand {
+    font-family: 'Inter', sans-serif;
+    font-weight: 200;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 1.5rem;
+    letter-spacing: 0.5em;
+    text-transform: uppercase;
+    animation: pulse-glow 2s ease-in-out infinite alternate;
+    margin-bottom: 2.5rem;
+}
+
+/* Text lift for grain readability */
+.text-lift {
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes pulse-glow {
+    0% {
+        opacity: 0.5;
+        /* Changed from 0.4 to 0.5 */
+    }
+
+    100% {
+        opacity: 0.8;
+        text-shadow: 0 0 40px var(--brand-glow);
+    }
+}
+
+.loader-brand-spinner {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid var(--brand-accent);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: luxury-spin 1.2s cubic-bezier(0.6, 0.2, 0.4, 0.8) infinite;
+}
+
+@keyframes luxury-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.icon-glow {
+    filter: drop-shadow(0 0 8px var(--brand-glow));
+    transition: filter 0.3s ease;
+}
+
+.icon-glow:hover {
+    filter: drop-shadow(0 0 15px var(--brand-accent));
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   DROPDOWN
+   ═══════════════════════════════════════════════════════════════════ */
+#city-dropdown {
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(10px) scale(0.98);
+    transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+    pointer-events: none;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+
+#city-dropdown.open {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+
+.dropdown-item {
+    transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+    position: relative;
+}
+
+.dropdown-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 0;
+    background-color: var(--brand-accent);
+    transition: width 0.3s ease;
+}
+
+.dropdown-item:hover::before,
+.dropdown-item.selected::before,
+.dropdown-item.highlighted::before {
+    width: 3px;
+}
+
+.dropdown-item:hover,
+.dropdown-item.selected,
+.dropdown-item.highlighted {
+    background: rgba(255, 255, 255, 0.04);
+    padding-left: 2rem;
+}
+
+.dropdown-item .city-name {
+    letter-spacing: -0.02em;
+}
+
+.dropdown-item.selected .city-name {
+    color: var(--brand-accent);
+    font-weight: 700;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   OFFER CARD (Dark Glass)
+   ═══════════════════════════════════════════════════════════════════ */
+.offer-card {
+    position: relative;
+    overflow: hidden;
+    border-radius: 1.25rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    box-shadow: var(--shadow-elite);
+    transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.offer-card:hover {
+    border-color: rgba(255, 255, 255, 0.15);
+    box-shadow: var(--shadow-floating);
+    transform: translateY(-4px);
+}
+
+.offer-card-bg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 0;
+    opacity: 0.2;
+    filter: saturate(0.6);
+    transition: transform 3s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.5s ease;
+    transform-origin: center;
+}
+
+.offer-card:hover .offer-card-bg {
+    transform: scale(1.06);
+    opacity: 0.3;
+}
+
+.offer-card-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background: linear-gradient(135deg,
+            rgba(15, 23, 42, 0.9) 0%,
+            rgba(15, 23, 42, 0.7) 50%,
+            rgba(15, 23, 42, 0.5) 100%);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+.offer-card-content {
+    position: relative;
+    z-index: 10;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   TOAST (Dark Glass)
+   ═══════════════════════════════════════════════════════════════════ */
+.toast {
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-left: 3px solid var(--brand-accent);
+    color: rgba(255, 255, 255, 0.9);
+    padding: 1rem 1.5rem;
+    border-radius: 14px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 300px;
+    transform: translateX(120%);
+    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8125rem;
+    pointer-events: auto;
+}
+
+.toast i {
+    color: var(--brand-accent);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   CHART
+   ═══════════════════════════════════════════════════════════════════ */
+#chart-container canvas {
+    max-height: 100%;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SKELETON SCREENS (Dark Shimmer)
+   ═══════════════════════════════════════════════════════════════════ */
+.skeleton-bone {
+    background: linear-gradient(90deg,
+            rgba(255, 255, 255, 0.03) 25%,
+            rgba(255, 255, 255, 0.08) 37%,
+            rgba(255, 255, 255, 0.03) 63%);
+    background-size: 400% 100%;
+    animation: skeleton-shimmer 1.4s ease infinite;
+    border-radius: 8px;
+}
+
+@keyframes skeleton-shimmer {
+    0% {
+        background-position: 100% 50%;
+    }
+
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
+.skeleton-layer {
+    transition: opacity 0.4s ease;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   LEAFLET MAP (Dark Integration)
+   ═══════════════════════════════════════════════════════════════════ */
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+    background: rgba(15, 23, 42, 0.92) !important;
+    color: rgba(255, 255, 255, 0.9) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5) !important;
+}
+
+.leaflet-container a.leaflet-popup-close-button {
+    color: var(--brand-accent) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+
+    #map,
+    #chart-container {
+        height: 250px;
+    }
+
+    .glass-panel {
+        border-radius: 1rem;
+    }
+}
+
+/* Modal Open State */
+body.modal-open {
+    overflow: hidden;
+}
+
+/* Empty State Card */
+.empty-state-card {
+    background: var(--glass-bg);
+    border: 1px dashed rgba(255, 255, 255, 0.1);
+    border-radius: 1.25rem;
+    transition: all 0.3s ease;
+}
+
+.empty-state-card:hover {
+    border-color: var(--brand-accent);
+    border-style: solid;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ANIMATED WEATHER ICONS (SVG)
+   ═══════════════════════════════════════════════════════════════════ */
+.weather-icon-animated {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.weather-icon-animated svg {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* Sun rotation */
+@keyframes sun-spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Rain drops */
+@keyframes rain-fall {
+    0% {
+        transform: translateY(-4px);
+        opacity: 0;
+    }
+
+    50% {
+        opacity: 1;
+    }
+
+    100% {
+        transform: translateY(4px);
+        opacity: 0;
+    }
+}
+
+/* Snow float */
+@keyframes snow-float {
+    0% {
+        transform: translateY(-2px) rotate(0deg);
+    }
+
+    50% {
+        transform: translateY(2px) rotate(180deg);
+    }
+
+    100% {
+        transform: translateY(-2px) rotate(360deg);
+    }
+}
+
+/* Cloud drift */
+@keyframes cloud-drift {
+    0% {
+        transform: translateX(-2px);
+    }
+
+    50% {
+        transform: translateX(2px);
+    }
+
+    100% {
+        transform: translateX(-2px);
+    }
+}
+
+/* Glassmorphism List Row Hover Extension (V4) */
+.row-hover-glass {
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.row-hover-glass::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: 1px solid rgba(255, 255, 255, 0);
+    border-radius: 0.75rem;
+    /* rounded-xl */
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 100%);
+    opacity: 0;
+    transition: opacity 0.4s ease, border-color 0.4s ease;
+    z-index: -1;
+    pointer-events: none;
+}
+
+.row-hover-glass:hover::before {
+    opacity: 1;
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.row-hover-glass:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+    background-color: rgba(255, 255, 255, 0.03);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ULTRA-REALISTIC 3D FORECAST (PRÓXIMA SEMANA)
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Volumetric Row Container */
+.forecast-row-3d {
+    background-color: transparent;
+    border: 1px solid rgba(255, 255, 255, 0);
+    box-shadow:
+        0 4px 6px -1px rgba(0, 0, 0, 0.1),
+        0 2px 4px -1px rgba(0, 0, 0, 0.06),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.forecast-row-3d:hover {
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow:
+        0 20px 25px -5px rgba(0, 0, 0, 0.5),
+        0 10px 10px -5px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.5);
+    transform: translateY(-4px) scale(1.01);
+}
+
+/* Deep Glass Thermo Container */
+.liquid-thermo-container {
+    /* Create depth */
+    box-shadow:
+        inset 0 3px 6px rgba(0, 0, 0, 0.8),
+        inset 0 0 4px rgba(0, 0, 0, 0.9),
+        0 1px 1px rgba(255, 255, 255, 0.08);
+    /* Bottom highlight to define the edge */
+    background: #050a14;
+}
+
+/* The neon bar itself */
+.liquid-thermo-bar {
+    /* Base shadow for the neon tube */
+    box-shadow:
+        inset 0 -1px 2px rgba(0, 0, 0, 0.8),
+        inset 0 1px 1px rgba(255, 255, 255, 0.4),
+        0 0 8px currentColor;
+    /* Spreads the light based on the gradient color indirectly via opacity, but handled strictly via tailwind drop-shadow/blur below */
+}
+
+/* Specular highlight on the bar */
+.liquid-flare {
+    opacity: 0.9;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.4) 100%);
+    box-shadow: -2px 0 4px rgba(255, 255, 255, 0.8);
+}

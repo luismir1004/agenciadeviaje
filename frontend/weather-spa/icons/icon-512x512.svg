@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="0" fill="#0F172A"/>
+  <!-- Compass Rose / Globe -->
+  <circle cx="256" cy="236" r="128" fill="none" stroke="#2563EB" stroke-width="3" opacity="0.3"/>
+  <circle cx="256" cy="236" r="86" fill="none" stroke="#2563EB" stroke-width="2" opacity="0.2"/>
+  <circle cx="256" cy="236" r="44" fill="none" stroke="#2563EB" stroke-width="1.5" opacity="0.15"/>
+  <!-- N/S/E/W lines -->
+  <line x1="256" y1="100" x2="256" y2="372" stroke="#2563EB" stroke-width="1.5" opacity="0.12"/>
+  <line x1="120" y1="236" x2="392" y2="236" stroke="#2563EB" stroke-width="1.5" opacity="0.12"/>
+  <!-- Diagonal lines -->
+  <line x1="165" y1="145" x2="347" y2="327" stroke="#2563EB" stroke-width="1" opacity="0.08"/>
+  <line x1="347" y1="145" x2="165" y2="327" stroke="#2563EB" stroke-width="1" opacity="0.08"/>
+  <!-- Compass needle N -->
+  <polygon points="256,108 244,184 256,170 268,184" fill="#2563EB"/>
+  <!-- Compass needle S -->
+  <polygon points="256,364 244,288 256,302 268,288" fill="#2563EB" opacity="0.3"/>
+  <!-- Compass needle E -->
+  <polygon points="392,236 316,224 302,236 316,248" fill="#2563EB" opacity="0.3"/>
+  <!-- Compass needle W -->
+  <polygon points="120,236 196,224 210,236 196,248" fill="#2563EB" opacity="0.3"/>
+  <!-- Center dot -->
+  <circle cx="256" cy="236" r="8" fill="#F8FAFC"/>
+  <circle cx="256" cy="236" r="4" fill="#2563EB"/>
+  <!-- Brand text -->
+  <text x="256" y="440" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="28" font-weight="600" fill="#94A3B8" letter-spacing="0.2em">NEXTGEN</text>
+  <text x="256" y="468" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="14" font-weight="400" fill="#475569" letter-spacing="0.35em">EUROPA</text>
+</svg>
