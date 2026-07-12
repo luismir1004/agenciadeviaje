@@ -48,7 +48,7 @@ class ExperienceManager {
         if (this.#isMuted) {
             this.#audioElement.pause();
             icon.className = 'fas fa-volume-mute transition-colors duration-300';
-            gsap.to(this.#audioBtn, { scale: 1, color: 'rgba(255,255,255,0.5)' });
+            gsap.to(this.#audioBtn, { scale: 1, color: '#565B64' });
 
             if (eq) {
                 eq.classList.add('opacity-0');
@@ -57,7 +57,7 @@ class ExperienceManager {
         } else {
             this.#audioElement.play().catch(() => { });
             icon.className = 'fas fa-volume-up transition-colors duration-300';
-            gsap.to(this.#audioBtn, { scale: 1.1, color: '#fff', ease: "elastic.out(1, 0.3)" });
+            gsap.to(this.#audioBtn, { scale: 1.1, color: '#17191E', ease: "elastic.out(1, 0.3)" });
 
             if (eq) {
                 eq.classList.remove('hidden');

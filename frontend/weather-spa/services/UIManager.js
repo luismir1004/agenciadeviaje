@@ -38,11 +38,11 @@ class UIManager {
 
         const label = document.createElement('span');
         label.className = 'text-[9px] uppercase tracking-[0.4em] font-bold';
-        label.style.cssText = 'color: var(--brand-dim); margin-bottom: 2px;';
+        label.style.cssText = 'color: var(--ink-faint); margin-bottom: 2px;';
         label.textContent = typeLabels[type] || type;
 
         const msg = document.createElement('span');
-        msg.className = 'text-sm font-light text-white/90 tracking-wide';
+        msg.className = 'text-sm font-normal text-ink tracking-wide';
         msg.textContent = message;
 
         col.append(label, msg);

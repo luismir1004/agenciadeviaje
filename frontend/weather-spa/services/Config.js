@@ -70,7 +70,7 @@ const APP_CONFIG = {
             icon: 'fa-cloud-sun',
             desc: 'Parcialmente Nublado',
             color: 'text-yellow-200',
-            svg: `<svg viewBox="0 0 24 24" fill="none" class="w-full h-full text-current drop-shadow-lg" stroke="currentColor" stroke-width="1.5"><g class="origin-center animate-[spin_12s_linear_infinite]"><circle cx="16" cy="8" r="3" fill="currentColor"/><path stroke-linecap="round" d="M16 3v1m0 8v1M12.46 4.46l.71.71m5.66 5.66l.71.71M11 8h1m8 0h1M13.17 10.83l-.71.71M19.54 4.46l-.71.71"/></g><path fill="rgba(255,255,255,0.8)" stroke="none" class="animate-[pulse_4s_ease-in-out_infinite]" d="M14 17.5a3.5 3.5 0 01-7 0 4.5 4.5 0 018.66-1.5 2.5 2.5 0 01-1.66 1.5z"/></svg>`
+            svg: `<svg viewBox="0 0 24 24" fill="none" class="w-full h-full text-current drop-shadow-lg" stroke="currentColor" stroke-width="1.5"><g class="origin-center animate-[spin_12s_linear_infinite]"><circle cx="16" cy="8" r="3" fill="currentColor"/><path stroke-linecap="round" d="M16 3v1m0 8v1M12.46 4.46l.71.71m5.66 5.66l.71.71M11 8h1m8 0h1M13.17 10.83l-.71.71M19.54 4.46l-.71.71"/></g><path fill="currentColor" fill-opacity="0.3" stroke="none" class="animate-[pulse_4s_ease-in-out_infinite]" d="M14 17.5a3.5 3.5 0 01-7 0 4.5 4.5 0 018.66-1.5 2.5 2.5 0 01-1.66 1.5z"/></svg>`
         },
         'mcloudy': {
             icon: 'fa-cloud',
@@ -112,19 +112,19 @@ const APP_CONFIG = {
             icon: 'fa-cloud-sun-rain',
             desc: 'Lluvias Aisladas',
             color: 'text-blue-400',
-            svg: `<svg viewBox="0 0 24 24" fill="none" class="w-full h-full text-current drop-shadow-lg" stroke="currentColor" stroke-width="1.5"><circle cx="16" cy="7" r="3" fill="currentColor"/><path fill="rgba(255,255,255,0.8)" stroke="none" d="M14 15a3.5 3.5 0 01-7 0 4.5 4.5 0 018.66-1.5 2.5 2.5 0 01-1.66 1.5z"/><path stroke-linecap="round" class="animate-[bounce_1s_infinite]" d="M9 17v3"/><path stroke-linecap="round" class="animate-[bounce_1.3s_infinite]" d="M13 17v2"/></svg>`
+            svg: `<svg viewBox="0 0 24 24" fill="none" class="w-full h-full text-current drop-shadow-lg" stroke="currentColor" stroke-width="1.5"><circle cx="16" cy="7" r="3" fill="currentColor"/><path fill="currentColor" fill-opacity="0.3" stroke="none" d="M14 15a3.5 3.5 0 01-7 0 4.5 4.5 0 018.66-1.5 2.5 2.5 0 01-1.66 1.5z"/><path stroke-linecap="round" class="animate-[bounce_1s_infinite]" d="M9 17v3"/><path stroke-linecap="round" class="animate-[bounce_1.3s_infinite]" d="M13 17v2"/></svg>`
         },
         'lightsnow': {
             icon: 'fa-snowflake',
             desc: 'Nieve Ligera',
             color: 'text-white',
-            svg: `<svg viewBox="0 0 24 24" fill="none" class="w-full h-full text-current drop-shadow-[0_0_10px_rgba(255,255,255,0.6)]" stroke="currentColor" stroke-width="1.5"><g class="origin-center animate-[spin_8s_linear_infinite]"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M4.93 19.07L19.07 4.93"/></g></svg>`
+            svg: `<svg viewBox="0 0 24 24" fill="none" class="w-full h-full text-current drop-shadow-[0_2px_6px_rgba(23,25,30,0.18)]" stroke="currentColor" stroke-width="1.5"><g class="origin-center animate-[spin_8s_linear_infinite]"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M4.93 19.07L19.07 4.93"/></g></svg>`
         },
         'snow': {
             icon: 'fa-snowflake',
             desc: 'Nieve',
             color: 'text-white',
-            svg: `<svg viewBox="0 0 24 24" fill="none" class="w-full h-full text-current drop-shadow-[0_0_15px_rgba(255,255,255,0.8)]" stroke="currentColor" stroke-width="2"><g class="origin-center animate-[spin_6s_linear_infinite]"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M4.93 19.07L19.07 4.93"/><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l3-3 3 3M5 9l-3 3 3 3M15 19l-3 3-3-3M19 15l3-3-3-3"/></g></svg>`
+            svg: `<svg viewBox="0 0 24 24" fill="none" class="w-full h-full text-current drop-shadow-[0_2px_8px_rgba(23,25,30,0.22)]" stroke="currentColor" stroke-width="2"><g class="origin-center animate-[spin_6s_linear_infinite]"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M4.93 19.07L19.07 4.93"/><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l3-3 3 3M5 9l-3 3 3 3M15 19l-3 3-3-3M19 15l3-3-3-3"/></g></svg>`
         },
         'ts': {
             icon: 'fa-bolt',

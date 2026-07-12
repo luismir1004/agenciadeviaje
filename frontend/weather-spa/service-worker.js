@@ -1,7 +1,7 @@
 /**
  * ╔═══════════════════════════════════════════════════════════════╗
  * ║  Service Worker — NextGen Europa PWA v3.0                    ║
- * ║  "Executive Swiss" Design System                             ║
+ * ║  "Meridian Editorial" Design System                          ║
  * ╠═══════════════════════════════════════════════════════════════╣
  * ║                                                               ║
  * ║  Strategy Matrix:                                            ║
@@ -24,7 +24,7 @@
  * ╚═══════════════════════════════════════════════════════════════╝
  */
 
-const CACHE_VERSION = 'nextgen-v5';
+const CACHE_VERSION = 'nextgen-v6';
 const OFFLINE_PAGE = './offline.html';
 
 // ─────────────────────────────────────────────────────────────────

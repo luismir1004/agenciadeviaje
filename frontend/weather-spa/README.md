@@ -37,16 +37,16 @@
 
 ## Visión General
 
-NextGen Europa es una **Single Page Application** que ofrece pronósticos meteorológicos de 7 días para las principales capitales europeas. Diseñada con una estética **"Executive Swiss"** (minimalismo corporativo de alto contraste), la aplicación combina datos en tiempo real de la API de 7Timer con una experiencia inmersiva de nivel premium.
+NextGen Europa es una **Single Page Application** que ofrece pronósticos meteorológicos de 7 días para las principales capitales europeas. Diseñada con el sistema **"Meridian Editorial"** (papel y tinta, tipografía display Fraunces, retícula suiza de líneas finas y acentos dinámicos según el clima), la aplicación combina datos en tiempo real de la API de 7Timer con una experiencia de lectura tipo revista de viajes.
 
 ### Características Principales
 
 | Feature | Descripción |
 |---|---|
 | **Pronóstico Extendido** | 7 días con temperaturas máx/mín y código climático |
-| **Motor de Temas Dinámicos** | La paleta de colores muta según el clima dominante |
+| **Motor de Temas Dinámicos** | El color de acento (tipografía, gráfico, fondos) muta según el clima dominante |
 | **Chart Pro** | Gráfico con tooltips climáticos y anotaciones min/max |
-| **Mapa Satelital** | Leaflet.js con tiles CARTO Dark y animaciones `flyTo` |
+| **Mapa Satelital** | Leaflet.js con tiles CARTO Light y animaciones `flyTo` |
 | **Sesión Persistente** | La última ciudad seleccionada se restaura al recargar |
 | **PWA Instalable** | Funciona offline con 4 estrategias de caching |
 | **Feedback Háptico** | Micro-sonido via Web Audio API al cambiar de ciudad |
@@ -118,7 +118,7 @@ La aplicación sigue un principio estricto de **Separación de Responsabilidades
 |---|---|
 | **GSAP 3.12** | Timelines cinematográficas: staggered reveals, `flyTo` de backgrounds, morphing de opacidad. Coordina el preloader → hero entrance con una cadena de `gsap.fromTo()` sincronizados. |
 | **Chart.js 4.x** | Canvas de temperatura con un **plugin custom de anotaciones** pintado directamente en el canvas (`afterDatasetsDraw`). Tooltips extendidos muestran descripción climática y amplitud térmica. |
-| **Leaflet.js 1.9** | Mapa satelital con tiles CARTO Dark. Animaciones `flyTo()` con zoom dinámico al cambiar de ciudad. Popups info con coordenadas. |
+| **Leaflet.js 1.9** | Mapa satelital con tiles CARTO Light. Animaciones `flyTo()` con zoom dinámico al cambiar de ciudad. Popups info con coordenadas. |
 | **FontAwesome 6.4** | Sistema de iconografía climática (☀️→`fa-sun`, 🌧→`fa-cloud-rain`). |
 
 ### APIs Nativas del Navegador
@@ -305,7 +305,7 @@ Compatible con **Add to Home Screen** en Android e **iOS Safari**.
 weather-spa/
 ├── index.html              # Entry-point semántico + CDN deps (SRI) + CSP
 ├── app.js                  # Controlador WeatherApp + registro del SW
-├── styles.css              # Design System Executive Swiss
+├── styles.css              # Design System Meridian Editorial (papel/tinta)
 ├── input.css / tailwind.config.js  # Fuente de Tailwind (build:css)
 ├── tailwind-dist.css       # Tailwind compilado (commiteado para deploy estático)
 ├── build.js                # Minificación (Terser + clean-css) → /dist

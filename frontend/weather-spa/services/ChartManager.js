@@ -1,7 +1,7 @@
 /**
- * ChartManager Pro — Dark Glass Edition
- * Chart.js wrapper with dark theme, animated line draw,
- * custom dark tooltips, and gradient pulse.
+ * ChartManager Pro — Meridian Editorial Edition
+ * Chart.js wrapper con paleta clara (papel/tinta), línea animada,
+ * tooltips custom y anotaciones min/max con acento dinámico.
  */
 class ChartManager {
     #ctx;
@@ -41,7 +41,7 @@ class ChartManager {
 
         // Get theme-aware accent color
         const themeAccent = getComputedStyle(document.documentElement)
-            .getPropertyValue('--brand-accent').trim() || '#3B82F6';
+            .getPropertyValue('--brand-accent').trim() || '#2563EB';
 
         // Dark gradient fill (blue glow)
         const gradientMax = this.#ctx.createLinearGradient(0, 0, 0, 300);
@@ -64,7 +64,7 @@ class ChartManager {
 
                 if (metaMin.data[minIdx]) {
                     const ptMin = metaMin.data[minIdx];
-                    this.#drawAnnotation(ctx, ptMin.x, ptMin.y, `${globalMin}°`, 'rgba(148,163,184,0.8)', '▼', 22);
+                    this.#drawAnnotation(ctx, ptMin.x, ptMin.y, `${globalMin}°`, 'rgba(86,91,100,0.9)', '▼', 22);
                 }
             }
         };
@@ -120,10 +120,10 @@ class ChartManager {
                         tension: 0.45,
                         fill: true,
                         pointBackgroundColor: maxTemps.map((_, i) =>
-                            i === maxIdx ? themeAccent : 'rgba(255,255,255,0.15)'
+                            i === maxIdx ? themeAccent : 'rgba(23,25,30,0.15)'
                         ),
                         pointBorderColor: maxTemps.map((_, i) =>
-                            i === maxIdx ? themeAccent : 'rgba(255,255,255,0.3)'
+                            i === maxIdx ? themeAccent : 'rgba(23,25,30,0.30)'
                         ),
                         pointRadius: maxTemps.map((_, i) =>
                             i === maxIdx ? 6 : 3
@@ -136,15 +136,15 @@ class ChartManager {
                     {
                         label: 'Mínima',
                         data: minTemps,
-                        borderColor: 'rgba(255, 255, 255, 0.15)',
+                        borderColor: 'rgba(23, 25, 30, 0.25)',
                         borderWidth: 1.5,
                         borderDash: [5, 5],
                         tension: 0.45,
                         fill: false,
                         pointBackgroundColor: minTemps.map((_, i) =>
-                            i === minIdx ? 'rgba(148,163,184,0.8)' : 'rgba(255,255,255,0.1)'
+                            i === minIdx ? 'rgba(86,91,100,0.9)' : 'rgba(23,25,30,0.12)'
                         ),
-                        pointBorderColor: 'rgba(255,255,255,0.2)',
+                        pointBorderColor: 'rgba(23,25,30,0.2)',
                         pointRadius: minTemps.map((_, i) =>
                             i === minIdx ? 6 : 2
                         ),
@@ -167,7 +167,7 @@ class ChartManager {
                 plugins: {
                     legend: {
                         labels: {
-                            color: 'rgba(255, 255, 255, 0.4)',
+                            color: 'rgba(86, 91, 100, 0.9)',
                             font: { family: 'Inter', size: 10, weight: 500 },
                             usePointStyle: true,
                             boxWidth: 5,
@@ -184,15 +184,15 @@ class ChartManager {
                     x: {
                         grid: { display: false },
                         ticks: {
-                            color: 'rgba(255, 255, 255, 0.3)',
+                            color: 'rgba(86, 91, 100, 0.8)',
                             font: { family: 'Inter', size: 10, weight: 500 }
                         },
                         border: { display: false }
                     },
                     y: {
-                        grid: { color: 'rgba(255, 255, 255, 0.04)' },
+                        grid: { color: 'rgba(23, 25, 30, 0.06)' },
                         ticks: {
-                            color: 'rgba(255, 255, 255, 0.3)',
+                            color: 'rgba(86, 91, 100, 0.8)',
                             font: { family: 'Inter', size: 10 },
                             callback: (val) => `${val}°`
                         },
@@ -231,11 +231,11 @@ class ChartManager {
         const h = 16;
 
         // Dark glass badge background
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
         ctx.beginPath();
         ctx.roundRect(x - w / 2, badgeY - h / 2 - padY, w, h + padY, 6);
         ctx.fill();
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.strokeStyle = 'rgba(23, 25, 30, 0.12)';
         ctx.lineWidth = 1;
         ctx.stroke();
 
@@ -285,20 +285,20 @@ class ChartManager {
 
             tooltipEl.innerHTML = `
                 <div class="flex items-center gap-2 mb-1.5">
-                    <i class="fas ${dayFn.icon} text-blue-400"></i>
-                    <span class="text-white font-bold font-sans tracking-wide capitalize">${dayFn.dayName.split(' ')[0]}</span>
+                    <i class="fas ${dayFn.icon} text-accent"></i>
+                    <span class="text-ink font-bold font-sans tracking-wide capitalize">${dayFn.dayName.split(' ')[0]}</span>
                 </div>
-                <div class="text-[11px] text-white/50 mb-3 capitalize tracking-widest">${dayFn.desc}</div>
+                <div class="text-[11px] text-ink-soft mb-3 capitalize tracking-widest">${dayFn.desc}</div>
                 <div class="flex flex-col gap-1.5 text-sm font-sans w-full">
-                    <div class="flex justify-between items-center text-white/90">
-                        <span class="text-xs text-white/50">🔺 Máxima</span>
+                    <div class="flex justify-between items-center text-ink">
+                        <span class="text-xs text-ink-soft">🔺 Máxima</span>
                         <span class="font-bold">${dayFn.max}°</span>
                     </div>
-                    <div class="flex justify-between items-center text-white/60">
-                        <span class="text-xs text-white/40">🔻 Mínima</span>
+                    <div class="flex justify-between items-center text-ink-soft">
+                        <span class="text-xs text-ink-faint">🔻 Mínima</span>
                         <span>${dayFn.min}°</span>
                     </div>
-                    <div class="flex justify-between items-center text-blue-400 mt-2 pt-2 border-t border-white/10 text-[10px] uppercase font-bold tracking-widest">
+                    <div class="flex justify-between items-center text-accent mt-2 pt-2 border-t border-hairline text-[10px] uppercase font-bold tracking-widest">
                         <span>Amplitud</span>
                         <span>${dayFn.max - dayFn.min}°</span>
                     </div>

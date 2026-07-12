@@ -283,7 +283,7 @@ class WeatherApp {
         const city = APP_CONFIG.CITIES.find(c => c.name === this.#currentCityName) || APP_CONFIG.CITIES[0];
 
         this.#map = L.map('map', { zoomControl: false }).setView([city.coords.lat, city.coords.lon], 12);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
             attribution: '&copy; OpenStreetMap &copy; CARTO',
             subdomains: 'abcd',
             maxZoom: 19
@@ -356,8 +356,8 @@ class WeatherApp {
         const weatherCode = APP_CONFIG.WEATHER_MAP[safeWeatherCode]?.svg || APP_CONFIG.WEATHER_MAP['clear'].svg;
         const markerHtml = `
             <div class="relative flex items-center justify-center w-12 h-12">
-                <div class="absolute inset-0 bg-blue-500/20 rounded-full animate-ping"></div>
-                <div class="relative z-10 w-10 h-10 bg-slate-900/90 border border-white/20 rounded-full shadow-[0_0_15px_rgba(59,130,246,0.5)] backdrop-blur-md flex items-center justify-center text-blue-400 p-2 drop-shadow-[0_0_10px_currentColor]">
+                <div class="absolute inset-0 bg-accent-dim rounded-full animate-ping"></div>
+                <div class="relative z-10 w-10 h-10 bg-surface border-2 border-accent rounded-full shadow-lg flex items-center justify-center text-accent p-2">
                     ${weatherCode}
                 </div>
             </div>
@@ -373,8 +373,8 @@ class WeatherApp {
 
         const popupContent = `
             <div class="text-center font-sans tracking-wide">
-                <div class="text-blue-400 font-bold mb-1 text-base">${sanitize(this.#currentCityName)}</div>
-                <div class="text-white/60 text-[9px] uppercase tracking-[0.2em] font-bold" id="popup-temp">
+                <div class="text-accent font-bold mb-1 text-base font-serif">${sanitize(this.#currentCityName)}</div>
+                <div class="text-ink-soft text-[9px] uppercase tracking-[0.2em] font-bold" id="popup-temp">
                     ${this.#currentTempRaw !== undefined ? this.#currentTempRaw + '°' : 'LIVE SAT'}
                 </div>
             </div>
@@ -390,16 +390,16 @@ class WeatherApp {
         const trigger = document.getElementById('city-trigger');
 
         dropdown.innerHTML = APP_CONFIG.CITIES.map((city, index) => `
-            <div class="dropdown-item p-4 flex items-center justify-between cursor-pointer border-b border-white/5 last:border-none group focus:outline-none"
+            <div class="dropdown-item p-4 flex items-center justify-between cursor-pointer border-b border-hairline last:border-none group focus:outline-none"
                  role="option" id="city-option-${index}" tabindex="-1" data-value="${index}" aria-selected="false">
                 <div class="flex items-center gap-3">
                     <div class="flex flex-col">
-                        <span class="city-name font-serif text-lg text-white group-hover:text-blue-400 transition-colors">${city.name}</span>
-                        <span class="text-[10px] text-white/40 uppercase tracking-widest">${city.country}</span>
+                        <span class="city-name font-serif text-lg text-ink group-hover:text-accent transition-colors">${city.name}</span>
+                        <span class="text-[10px] text-ink-faint uppercase tracking-widest">${city.country}</span>
                     </div>
-                    ${city.isCapital ? `<span class="text-[9px] font-bold text-blue-500/80 px-1.5 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded uppercase tracking-tighter ml-auto">Capital</span>` : ''}
+                    ${city.isCapital ? `<span class="text-[9px] font-bold text-accent px-1.5 py-0.5 bg-accent-dim border border-hairline rounded uppercase tracking-tighter ml-auto">Capital</span>` : ''}
                 </div>
-                <i class="fas fa-chevron-right text-white/20 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all"></i>
+                <i class="fas fa-chevron-right text-ink-faint opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all"></i>
             </div>
         `).join('');
 
@@ -633,6 +633,14 @@ class WeatherApp {
             this.#currentForecast = dailyForecasts;
 
             const validatedForecasts = this.#validateForecastData(dailyForecasts);
+
+            // Apply dynamic theme FIRST: the chart and accent-tinted UI
+            // read --brand-accent at render time, so the theme must be
+            // in place before they paint (otherwise they lag one city behind)
+            if (validatedForecasts[0]) {
+                this.#applyWeatherTheme(validatedForecasts[0].weather);
+            }
+
             this.#renderForecast(validatedForecasts);
 
             // Chart may not be initialized yet if user hasn't scrolled
@@ -640,11 +648,6 @@ class WeatherApp {
                 this.#chart.render(validatedForecasts);
             } else {
                 this.#pendingChartData = validatedForecasts;
-            }
-
-            // Apply dynamic theme based on today's dominant weather
-            if (validatedForecasts[0]) {
-                this.#applyWeatherTheme(validatedForecasts[0].weather);
             }
 
             gsap.to(this.ctaContainer, { opacity: 1, duration: 1, delay: 0.5 });
@@ -894,38 +897,40 @@ class WeatherApp {
                 <div class="flex flex-col md:flex-row items-center justify-between w-full h-full relative z-10 gap-8">
                     <!-- Data Column -->
                     <div class="w-full md:w-1/2 flex flex-col justify-center items-start">
-                        <div class="flex items-center gap-3 mb-6">
-                            <span class="px-3 py-1.5 bg-blue-500/10 border border-blue-500/20 rounded-full text-blue-400 text-[10px] font-bold uppercase tracking-[0.2em]">
+                        <div class="flex items-center gap-3 mb-6 flex-wrap">
+                            <span class="px-3 py-1.5 bg-accent-dim rounded-full text-accent text-[10px] font-bold uppercase tracking-[0.2em]">
                                 Ahora en ${safeCity}
                             </span>
-                            <span class="text-white/30 text-sm font-light">${safeDate}</span>
+                            <span class="text-ink-faint text-sm font-light">${safeDate}</span>
                         </div>
-                        
-                        <h2 class="temp-display text-7xl md:text-[8rem] font-light tracking-tighter text-white mb-2 leading-none">
-                            ${safeMax}<span class="text-4xl md:text-5xl text-white/40 align-top">°</span>
+
+                        <h2 class="temp-display text-7xl md:text-[8rem] text-ink mb-2 leading-none">
+                            ${safeMax}<span class="text-4xl md:text-5xl text-ink-faint align-top">°</span>
                         </h2>
 
-                        
-                        <div class="text-lg md:text-xl text-blue-300 font-light mb-8 text-lift capitalize tracking-wide">
+                        <div class="text-lg md:text-xl text-accent font-serif italic mb-8 capitalize tracking-wide">
                             ${safeDesc}
                         </div>
 
-                        <div class="flex gap-10 text-white/40">
+                        <div class="flex gap-10 border-t border-hairline pt-5 w-full max-w-xs">
                             <div>
-                                <span class="block text-[10px] uppercase tracking-[0.15em] mb-1 font-semibold text-white/50">Mínima</span>
-                                <span class="text-2xl text-white/90 font-light">${safeMin}°</span>
+                                <span class="block text-[10px] uppercase tracking-[0.15em] mb-1 font-semibold text-ink-soft">Mínima</span>
+                                <span class="text-2xl text-ink font-serif">${safeMin}°</span>
                             </div>
                             <div>
-                                <span class="block text-[10px] uppercase tracking-[0.15em] mb-1 font-semibold text-white/50">Prob. Precip.</span>
-                                <span class="text-2xl text-white/90 font-light">${Number.isFinite(today.rainChance) ? today.rainChance : 0}%</span>
+                                <span class="block text-[10px] uppercase tracking-[0.15em] mb-1 font-semibold text-ink-soft">Prob. Precip.</span>
+                                <span class="text-2xl text-ink font-serif">${Number.isFinite(today.rainChance) ? today.rainChance : 0}%</span>
                             </div>
                         </div>
                     </div>
 
                     <!-- Icon Column -->
                     <div class="w-full md:w-1/2 flex justify-center md:justify-end items-center mt-6 md:mt-0 relative overflow-visible">
-                        <div class="w-56 h-56 md:w-80 md:h-80 lg:w-[28rem] lg:h-[28rem] drop-shadow-[0_0_40px_rgba(255,255,255,0.2)] text-white/90 md:translate-x-4 lg:translate-x-8 flex items-center justify-center">
-                            ${mainSvg.replace('<svg', '<svg style="width: 100% !important; height: 100% !important; min-width: 100%; min-height: 100%;" class="weather-icon-animated"')}
+                        <div class="relative w-56 h-56 md:w-72 md:h-72 lg:w-96 lg:h-96 flex items-center justify-center">
+                            <div class="icon-disc"></div>
+                            <div class="relative z-10 w-[70%] h-[70%] text-accent flex items-center justify-center">
+                                ${mainSvg.replace('<svg', '<svg style="width: 100% !important; height: 100% !important; min-width: 100%; min-height: 100%;" class="weather-icon-animated"')}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -956,65 +961,46 @@ class WeatherApp {
             // Rain badge con probabilidad real derivada de la API
             const rainChance = Number.isFinite(day.rainChance) ? day.rainChance : 0;
             const isRainy = rainChance >= 30 || safeRowWeather.includes('rain') || safeRowWeather.includes('shower') || safeRowWeather.includes('ts');
-            const rainBadge = isRainy ? `<div class="mt-1 flex items-center justify-center gap-1 text-[10px] text-sky-400 font-medium whitespace-nowrap"><i class="fas fa-tint"></i><span class="font-mono">${rainChance}%</span></div>` : '';
+            const rainBadge = isRainy ? `<div class="mt-1 flex items-center justify-center gap-1 text-[10px] text-sky-600 font-medium whitespace-nowrap"><i class="fas fa-tint"></i><span class="font-mono">${rainChance}%</span></div>` : '';
 
             return `
-            <div class="forecast-row-3d group relative flex flex-col md:flex-row items-center justify-between p-5 mb-4 rounded-2xl transition-all duration-500 cursor-pointer w-full overflow-hidden">
-                
-                <!-- Background & Glass Layers -->
-                <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-2xl z-0 transition-opacity duration-500 group-hover:bg-slate-800/60"></div>
-                <div class="absolute inset-0 bg-gradient-to-br from-white/[0.08] to-transparent z-[1] pointer-events-none"></div>
-                <!-- Top Light Edge & Bottom Shadow Edge -->
-                <div class="absolute inset-0 border-t border-white/[0.15] border-b border-black/50 rounded-2xl z-[2] pointer-events-none mix-blend-overlay"></div>
-                <!-- Cinematic Grain Texture -->
-                <div class="absolute inset-0 opacity-[0.15] z-[3] pointer-events-none mix-blend-overlay" style="background-image: url('data:image/svg+xml,%3Csvg viewBox=\\"0 0 200 200\\" xmlns=\\"http://www.w3.org/2000/svg\\"%3E%3Cfilter id=\\"noiseFilter\\"%3E%3CfeTurbulence type=\\"fractalNoise\\" baseFrequency=\\"0.8\\" numOctaves=\\"3\\" stitchTiles=\\"stitch\\"/%3E%3C/filter%3E%3Crect width=\\"100%\\" height=\\"100%\\" filter=\\"url(%23noiseFilter)\\"/%3E%3C/svg%3E');"></div>
+            <div class="forecast-row-3d group relative flex flex-col md:flex-row items-center justify-between px-6 py-5 transition-all duration-300 cursor-pointer w-full">
 
                 <!-- Content Container -->
                 <div class="relative z-10 flex w-full items-center justify-between">
                     <!-- Date & Day -->
                     <div class="flex items-center gap-4 w-[40%] md:w-[30%] flex-shrink-0">
-                        <div class="flex flex-col items-center justify-center bg-white/5 border border-white/10 rounded-xl w-12 h-12 shadow-inner group-hover:bg-white/10 transition-colors">
-                            <span class="text-white/40 font-mono text-[10px] tracking-widest uppercase mb-0.5">Día</span>
-                            <span class="text-white/90 font-mono font-bold text-lg leading-none">${sDate.split(' ')[0]}</span>
+                        <div class="date-block flex flex-col items-center justify-center rounded-xl w-12 h-12 transition-colors text-ink">
+                            <span class="text-ink-faint text-[9px] tracking-widest uppercase mb-0.5 font-sans font-semibold">Día</span>
+                            <span class="font-bold text-lg leading-none">${sDate.split(' ')[0]}</span>
                         </div>
                         <div class="flex flex-col">
-                            <span class="text-base md:text-xl font-semibold font-serif text-white uppercase tracking-wider truncate group-hover:text-blue-300 transition-colors duration-300 drop-shadow-md">${sDayName.split(' ')[0]}</span>
-                            <span class="text-[9px] md:text-[10px] text-blue-200/60 uppercase tracking-[0.2em] mt-0.5 truncate max-w-[100px] md:max-w-[150px] font-medium">${weatherDesc}</span>
+                            <span class="text-base md:text-xl font-serif text-ink capitalize tracking-tight truncate group-hover:text-accent transition-colors duration-300">${sDayName.split(' ')[0]}</span>
+                            <span class="text-[9px] md:text-[10px] text-ink-faint uppercase tracking-[0.2em] mt-0.5 truncate max-w-[100px] md:max-w-[150px] font-medium">${weatherDesc}</span>
                         </div>
                     </div>
-                    
+
                     <!-- Icon & Probability -->
                     <div class="flex flex-col items-center justify-center w-[20%] md:w-[20%] flex-shrink-0 relative">
-                        <!-- Holographic Glow behind icon -->
-                        <div class="absolute inset-0 bg-blue-500/10 blur-xl rounded-full scale-50 group-hover:scale-100 transition-transform duration-500 opacity-0 group-hover:opacity-100 hidden md:block"></div>
-                        <div class="w-10 h-10 md:w-14 md:h-14 text-white/90 drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] group-hover:scale-110 group-hover:-translate-y-1 transition-all duration-300 relative z-10">
+                        <div class="w-10 h-10 md:w-12 md:h-12 text-ink-soft group-hover:text-accent group-hover:scale-110 transition-all duration-300 relative z-10">
                             ${rowSvg}
                         </div>
                         ${rainBadge}
                     </div>
 
-                    <!-- Volumetric Temperature Bar -->
+                    <!-- Barra de amplitud térmica -->
                     <div class="flex items-center justify-end gap-3 md:gap-5 w-[40%] md:w-[50%] flex-shrink-0">
-                        <span class="text-sm md:text-base font-semibold text-white/50 w-8 text-right drop-shadow-sm">${sMin}°</span>
-                        
-                        <!-- Liquid Thermo Container -->
-                        <div class="liquid-thermo-container flex-grow max-w-[140px] md:max-w-[220px] h-2.5 md:h-3.5 bg-slate-950/80 rounded-full overflow-hidden relative shadow-[inset_0_2px_4px_rgba(0,0,0,0.6),0_1px_1px_rgba(255,255,255,0.05)] border border-black/40">
-                            <!-- Inner Glass Reflection -->
-                            <div class="absolute inset-0 rounded-full border-t border-white/10 z-20 pointer-events-none"></div>
-                            
-                            <!-- Neon Liquid Tube -->
-                            <div class="liquid-thermo-bar absolute h-full rounded-full transition-all duration-700 ease-out z-10" 
+                        <span class="text-sm md:text-base font-medium text-ink-faint w-8 text-right">${sMin}°</span>
+
+                        <div class="liquid-thermo-container flex-grow max-w-[140px] md:max-w-[220px] h-2.5 md:h-3 rounded-full overflow-hidden relative">
+                            <div class="liquid-thermo-bar absolute h-full rounded-full transition-all duration-700 ease-out z-10"
                                  style="left: ${leftOffset}%; width: ${Math.max(barWidth, 8)}%;">
-                                <!-- Gradient core -->
-                                <div class="absolute inset-0 bg-gradient-to-r ${isRainy ? 'from-indigo-500 to-cyan-400' : 'from-blue-500 via-sky-400 to-amber-400'} opacity-90 blur-[1px]"></div>
-                                <!-- Bright center streak (Neon effect) -->
-                                <div class="absolute inset-y-1/4 inset-x-0 bg-white/40 rounded-full blur-[0.5px]"></div>
-                                <!-- Flare indicator -->
-                                <div class="liquid-flare absolute right-0 top-0 bottom-0 w-2 bg-white/80 rounded-full blur-[1px] shadow-[0_0_8px_rgba(255,255,255,0.8)]"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r ${isRainy ? 'from-indigo-400 to-sky-400' : 'from-sky-500 to-amber-400'} opacity-90"></div>
+                                <div class="liquid-flare absolute right-0 top-0 bottom-0 w-1.5 rounded-full"></div>
                             </div>
                         </div>
-                        
-                        <span class="text-sm md:text-lg font-bold text-white w-8 text-left drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]">${sMax}°</span>
+
+                        <span class="text-sm md:text-lg font-bold text-ink w-8 text-left font-serif">${sMax}°</span>
                     </div>
                 </div>
             </div>
@@ -1094,18 +1080,18 @@ class WeatherApp {
             const sEvening = sanitize(day.plan.evening);
 
             return `
-                <div class="border-l-2 border-blue-500/30 pl-4 py-2 hover:bg-white/5 transition-colors rounded-r-lg">
+                <div class="border-l-2 pl-4 py-2 hover:bg-paper transition-colors rounded-r-lg" style="border-color: var(--brand-accent)">
                 <div class="flex items-center justify-between mb-2">
-                    <h4 class="text-blue-400 font-semibold font-serif text-xl">${sDate}</h4>
-                    <div class="flex items-center gap-2 text-sm opacity-70">
-                        <i class="fas ${sIcon}"></i>
+                    <h4 class="text-accent font-semibold font-serif text-xl capitalize">${sDate}</h4>
+                    <div class="flex items-center gap-2 text-sm text-ink-soft">
+                        <i class="fas ${sIcon} text-accent"></i>
                         <span>${sTemp}° ${sCond}</span>
                     </div>
                 </div>
-                <div class="space-y-2 text-sm">
-                    <p><strong class="text-blue-200">Mañana:</strong> ${sMorning}</p>
-                    <p><strong class="text-blue-200">Tarde:</strong> ${sAfternoon}</p>
-                    <p><strong class="text-blue-200">Noche:</strong> ${sEvening}</p>
+                <div class="space-y-2 text-sm text-ink-soft">
+                    <p><strong class="text-ink font-semibold">Mañana:</strong> ${sMorning}</p>
+                    <p><strong class="text-ink font-semibold">Tarde:</strong> ${sAfternoon}</p>
+                    <p><strong class="text-ink font-semibold">Noche:</strong> ${sEvening}</p>
                 </div>
             </div>
                 `;
@@ -1165,7 +1151,7 @@ class WeatherApp {
 
             // Inject Skeleton into bento list
             this.bentoList.innerHTML = Array.from({ length: 5 }, (_, i) => `
-                <div class="flex items-center justify-between py-4 md:py-5 px-6 border-b border-white/5 transition-all duration-300 w-full" style="animation-delay: ${i * 0.1}s">
+                <div class="flex items-center justify-between py-4 md:py-5 px-6 border-b border-hairline transition-all duration-300 w-full" style="animation-delay: ${i * 0.1}s">
                     <div class="flex items-center gap-3 md:gap-4 w-[35%] md:w-[30%] flex-shrink-0">
                         <div class="skeleton-bone h-4 w-5 md:w-6 rounded"></div>
                         <div class="flex flex-col gap-1 w-full max-w-[120px]">
@@ -1211,13 +1197,13 @@ class WeatherApp {
 
             this.errorState.innerHTML = `
                     <div class="flex flex-col items-center justify-center p-12 text-center">
-                    <div class="w-20 h-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mb-6">
-                        <i class="fas ${isOffline ? 'fa-wifi' : 'fa-satellite-dish'} text-3xl ${isOffline ? 'text-white/30' : 'text-red-400/80'}"></i>
+                    <div class="w-20 h-20 rounded-full bg-paper border border-hairline flex items-center justify-center mb-6">
+                        <i class="fas ${isOffline ? 'fa-wifi' : 'fa-satellite-dish'} text-3xl ${isOffline ? 'text-ink-faint' : 'text-red-600'}"></i>
                     </div>
-                    <h3 class="text-xl font-medium text-white mb-2 font-serif">
+                    <h3 class="text-xl font-medium text-ink mb-2 font-serif">
                         ${isOffline ? 'Sin Conexión al Satélite' : 'Interferencia de Señal'}
                     </h3>
-                    <p class="text-white/40 text-sm max-w-md mb-6 leading-relaxed">
+                    <p class="text-ink-soft text-sm max-w-md mb-6 leading-relaxed">
                         ${isOffline
                     ? 'No hay conexión a internet. Conéctate a una red y vuelve a intentarlo.'
                     : 'No pudimos conectar con los servicios meteorológicos. Por favor, inténtalo de nuevo.'}
