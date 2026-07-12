@@ -37,6 +37,9 @@ const APP_SHELL = [
     './styles.css',
     './styles.css?v=3',      // la página lo pide con query — clave de caché distinta (B9)
     './tailwind-dist.css',
+    './fonts/fraunces-latin-opsz-normal.woff2',
+    './fonts/fraunces-latin-opsz-italic.woff2',
+    './fonts/inter-latin-wght-normal.woff2',
     './app.js',
     './manifest.json',
     './favicon.ico',
@@ -62,8 +65,6 @@ const APP_SHELL = [
 // ─────────────────────────────────────────────────────────────────
 const CDN_PATTERNS = [
     'cdn.jsdelivr.net',       // Chart.js, GSAP, Font Awesome, localforage
-    'fonts.googleapis.com',
-    'fonts.gstatic.com',
     'unpkg.com/leaflet',
     'basemaps.cartocdn.com'   // Leaflet map tiles
 ];

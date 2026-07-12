@@ -64,11 +64,15 @@ class ChartManager {
             }
         };
 
+        const reducedMotion = typeof REDUCED_MOTION !== 'undefined' && REDUCED_MOTION;
+
         // Animated line draw plugin
         const lineDrawPlugin = {
             id: 'lineDrawAnimation',
             afterInit: (chart) => {
-                chart._drawProgress = 0;
+                // Con movimiento reducido, la línea aparece completa
+                chart._drawProgress = reducedMotion ? 1 : 0;
+                if (reducedMotion) return;
                 const animate = () => {
                     if (chart._drawProgress < 1) {
                         chart._drawProgress += 0.02;
@@ -156,7 +160,7 @@ class ChartManager {
                     padding: { top: 55 }
                 },
                 animation: {
-                    duration: 1500,
+                    duration: reducedMotion ? 0 : 1500,
                     easing: 'easeOutQuart'
                 },
                 plugins: {
@@ -293,7 +297,7 @@ class ChartManager {
                         <span class="text-xs text-ink-faint">🔻 Mínima</span>
                         <span>${dayFn.min}°</span>
                     </div>
-                    <div class="flex justify-between items-center text-accent mt-2 pt-2 border-t border-hairline text-[10px] uppercase font-bold tracking-widest">
+                    <div class="flex justify-between items-center text-accent-strong mt-2 pt-2 border-t border-hairline text-[10px] uppercase font-bold tracking-widest">
                         <span>Amplitud</span>
                         <span>${dayFn.max - dayFn.min}°</span>
                     </div>

@@ -4,6 +4,33 @@
    Acentos dinámicos por clima vía --brand-accent (Config.js)
    ═══════════════════════════════════════════════════════════════════ */
 
+/* ── Fuentes self-hosted (variables, subset latin) ─────────────────
+   Sin Google Fonts: menos latencia, sin IP-logging de terceros,
+   y cacheables por el propio Service Worker. */
+@font-face {
+    font-family: 'Fraunces';
+    src: url('fonts/fraunces-latin-opsz-normal.woff2') format('woff2-variations');
+    font-weight: 100 900;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Fraunces';
+    src: url('fonts/fraunces-latin-opsz-italic.woff2') format('woff2-variations');
+    font-weight: 100 900;
+    font-style: italic;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Inter';
+    src: url('fonts/inter-latin-wght-normal.woff2') format('woff2-variations');
+    font-weight: 100 900;
+    font-style: normal;
+    font-display: swap;
+}
+
 /* ── Design Tokens ────────────────────────────────────────────────── */
 :root {
     /* Paper & Ink */
@@ -12,12 +39,15 @@
     --surface: #FFFFFF;
     --ink: #17191E;
     --ink-soft: #565B64;
-    --ink-faint: #9BA0A8;
+    --ink-faint: #6B6E74;  /* AA 4.69:1 sobre papel (antes #9BA0A8 = 2.41:1) */
     --hairline: #E6E3DB;
     --hairline-strong: #D8D4CA;
 
-    /* Accent dinámico (lo muta #applyWeatherTheme según el clima) */
+    /* Accent dinámico (lo muta #applyWeatherTheme según el clima).
+       --brand-accent-text es la variante oscurecida que cumple AA (>=4.5:1)
+       para texto pequeño; el accent base queda para gráficos y display. */
     --brand-accent: #2563EB;
+    --brand-accent-text: #2563EB;
     --brand-accent-hover: #1D4ED8;
     --brand-dim: rgba(37, 99, 235, 0.10);
     --brand-glow: rgba(37, 99, 235, 0.15);
@@ -137,7 +167,7 @@ h3,
 }
 
 .eyebrow--accent {
-    color: var(--brand-accent);
+    color: var(--brand-accent-text);
 }
 
 /* Regla suiza: encabezado de sección con doble línea */
@@ -161,12 +191,13 @@ h3,
     font-family: 'Fraunces', Georgia, serif;
     font-size: 0.8125rem;
     font-weight: 600;
-    color: var(--brand-accent);
+    color: var(--brand-accent-text);
     font-feature-settings: 'tnum';
 }
 
 /* Utilidades de acento dinámico */
 .text-accent { color: var(--brand-accent); }
+.text-accent-strong { color: var(--brand-accent-text); }
 .bg-accent { background-color: var(--brand-accent); }
 .bg-accent-dim { background-color: var(--brand-dim); }
 .border-accent { border-color: var(--brand-accent); }
@@ -712,4 +743,64 @@ body.modal-open {
 
 .no-scrollbar::-webkit-scrollbar {
     display: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MOVIMIENTO REDUCIDO (WCAG 2.3.3)
+   Anula animaciones y transiciones CSS; los tweens GSAP se aceleran
+   vía globalTimeline.timeScale en app.js y los bucles infinitos se
+   omiten en su punto de creación.
+   ═══════════════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    #mesh-bg {
+        animation: none !important;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   IMPRESIÓN DEL ITINERARIO ("Guardar Plan" → PDF real del navegador)
+   Se activa con body.print-itinerary desde app.js antes de print().
+   ═══════════════════════════════════════════════════════════════════ */
+@media print {
+    body.print-itinerary * {
+        visibility: hidden;
+    }
+
+    body.print-itinerary #modal-content,
+    body.print-itinerary #modal-content * {
+        visibility: visible;
+    }
+
+    body.print-itinerary #modal-content {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        max-height: none;
+        overflow: visible;
+        transform: none !important;
+        opacity: 1 !important;
+        box-shadow: none;
+        border: none;
+        border-radius: 0;
+        padding: 0;
+        background: #fff;
+        color: #000;
+    }
+
+    /* Sin controles interactivos en papel */
+    body.print-itinerary #close-modal,
+    body.print-itinerary #save-itinerary {
+        display: none !important;
+    }
 }

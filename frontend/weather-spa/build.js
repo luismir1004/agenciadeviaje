@@ -46,7 +46,10 @@ const COPY_FILES = [
     'icons/icon-512x512-maskable.png',
     'icons/apple-touch-icon.png',
     'tailwind-dist.css',
-    'data/deals.json'
+    'data/deals.json',
+    'fonts/fraunces-latin-opsz-normal.woff2',
+    'fonts/fraunces-latin-opsz-italic.woff2',
+    'fonts/inter-latin-wght-normal.woff2'
 ];
 
 // ─────────────────────────────────────────────

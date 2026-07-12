@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  test:
+    name: Sintaxis · Build · E2E
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend/weather-spa
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/weather-spa/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Verificar sintaxis JS
+        run: |
+          for f in app.js service-worker.js build.js services/*.js tests/e2e/*.js; do
+            node --check "$f"
+          done
+
+      - name: Compilar Tailwind
+        run: npm run build:css
+
+      - name: Comprobar que tailwind-dist.css está al día
+        run: git diff --exit-code tailwind-dist.css
+
+      - name: Instalar Chromium (Playwright)
+        run: npx playwright install --with-deps chromium
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: ''
+
+      - name: Suite e2e
+        run: npm test

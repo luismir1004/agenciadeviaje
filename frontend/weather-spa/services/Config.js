@@ -3,6 +3,13 @@
  * Centralized configuration for the European Travel Agency Weather App.
  * All data constants and static mappings are defined here.
  */
+
+// Preferencia de movimiento reducido — consultada por app.js, HeroManager
+// y ChartManager para saltar/acelerar animaciones (WCAG 2.3.3).
+const REDUCED_MOTION = typeof window !== 'undefined'
+    && typeof window.matchMedia === 'function'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 const APP_CONFIG = {
     CITIES: [
         { name: 'Madrid', country: 'España', isCapital: true, coords: { lat: 40.4168, lon: -3.7038 }, timezone: 'Europe/Madrid' },
@@ -209,22 +216,22 @@ const APP_CONFIG = {
 
     // Dynamic color themes based on dominant weather
     WEATHER_THEMES: {
-        clear: { accent: '#D97706', hover: '#B45309', dim: 'rgba(217,119,6,0.10)', glow: 'rgba(217,119,6,0.15)', chart: '#D97706' },   // Warm Amber
-        pcloudy: { accent: '#2563EB', hover: '#1D4ED8', dim: 'rgba(37,99,235,0.10)', glow: 'rgba(37,99,235,0.15)', chart: '#2563EB' },   // Default Cobalt
-        mcloudy: { accent: '#64748B', hover: '#475569', dim: 'rgba(100,116,139,0.10)', glow: 'rgba(100,116,139,0.15)', chart: '#64748B' },   // Slate
-        cloudy: { accent: '#64748B', hover: '#475569', dim: 'rgba(100,116,139,0.10)', glow: 'rgba(100,116,139,0.15)', chart: '#64748B' },   // Slate
-        humid: { accent: '#0891B2', hover: '#0E7490', dim: 'rgba(8,145,178,0.10)', glow: 'rgba(8,145,178,0.15)', chart: '#0891B2' },   // Cyan
-        lightrain: { accent: '#4B7BB5', hover: '#3B6A9E', dim: 'rgba(75,123,181,0.10)', glow: 'rgba(75,123,181,0.15)', chart: '#4B7BB5' },   // Steel Blue
-        rain: { accent: '#4B7BB5', hover: '#3B6A9E', dim: 'rgba(75,123,181,0.10)', glow: 'rgba(75,123,181,0.15)', chart: '#4B7BB5' },   // Steel Blue
-        oshower: { accent: '#4B7BB5', hover: '#3B6A9E', dim: 'rgba(75,123,181,0.10)', glow: 'rgba(75,123,181,0.15)', chart: '#4B7BB5' },
-        ishower: { accent: '#4B7BB5', hover: '#3B6A9E', dim: 'rgba(75,123,181,0.10)', glow: 'rgba(75,123,181,0.15)', chart: '#4B7BB5' },
-        lightsnow: { accent: '#7C93C3', hover: '#6B82B2', dim: 'rgba(124,147,195,0.10)', glow: 'rgba(124,147,195,0.15)', chart: '#7C93C3' },   // Ice Blue
-        snow: { accent: '#7C93C3', hover: '#6B82B2', dim: 'rgba(124,147,195,0.10)', glow: 'rgba(124,147,195,0.15)', chart: '#7C93C3' },   // Ice Blue
-        ts: { accent: '#7C3AED', hover: '#6D28D9', dim: 'rgba(124,58,237,0.10)', glow: 'rgba(124,58,237,0.15)', chart: '#7C3AED' },   // Violet Storm
-        tsrain: { accent: '#7C3AED', hover: '#6D28D9', dim: 'rgba(124,58,237,0.10)', glow: 'rgba(124,58,237,0.15)', chart: '#7C3AED' },
-        rainsnow: { accent: '#7C93C3', hover: '#6B82B2', dim: 'rgba(124,147,195,0.10)', glow: 'rgba(124,147,195,0.15)', chart: '#7C93C3' },  // Ice Blue
-        foggy: { accent: '#64748B', hover: '#475569', dim: 'rgba(100,116,139,0.10)', glow: 'rgba(100,116,139,0.15)', chart: '#64748B' },  // Slate
-        windy: { accent: '#0D9488', hover: '#0F766E', dim: 'rgba(13,148,136,0.10)', glow: 'rgba(13,148,136,0.15)', chart: '#0D9488' }   // Teal
+        clear: { accent: '#D27306', text: '#A75C05', hover: '#B45309', dim: 'rgba(217,119,6,0.10)', glow: 'rgba(217,119,6,0.15)', chart: '#D27306' },   // Warm Amber
+        pcloudy: { accent: '#2563EB', text: '#2563EB', hover: '#1D4ED8', dim: 'rgba(37,99,235,0.10)', glow: 'rgba(37,99,235,0.15)', chart: '#2563EB' },   // Default Cobalt
+        mcloudy: { accent: '#64748B', text: '#606F85', hover: '#475569', dim: 'rgba(100,116,139,0.10)', glow: 'rgba(100,116,139,0.15)', chart: '#64748B' },   // Slate
+        cloudy: { accent: '#64748B', text: '#606F85', hover: '#475569', dim: 'rgba(100,116,139,0.10)', glow: 'rgba(100,116,139,0.15)', chart: '#64748B' },   // Slate
+        humid: { accent: '#0891B2', text: '#077894', hover: '#0E7490', dim: 'rgba(8,145,178,0.10)', glow: 'rgba(8,145,178,0.15)', chart: '#0891B2' },   // Cyan
+        lightrain: { accent: '#4B7BB5', text: '#4571A7', hover: '#3B6A9E', dim: 'rgba(75,123,181,0.10)', glow: 'rgba(75,123,181,0.15)', chart: '#4B7BB5' },   // Steel Blue
+        rain: { accent: '#4B7BB5', text: '#4571A7', hover: '#3B6A9E', dim: 'rgba(75,123,181,0.10)', glow: 'rgba(75,123,181,0.15)', chart: '#4B7BB5' },   // Steel Blue
+        oshower: { accent: '#4B7BB5', text: '#4571A7', hover: '#3B6A9E', dim: 'rgba(75,123,181,0.10)', glow: 'rgba(75,123,181,0.15)', chart: '#4B7BB5' },
+        ishower: { accent: '#4B7BB5', text: '#4571A7', hover: '#3B6A9E', dim: 'rgba(75,123,181,0.10)', glow: 'rgba(75,123,181,0.15)', chart: '#4B7BB5' },
+        lightsnow: { accent: '#758AB7', text: '#5D6E92', hover: '#6B82B2', dim: 'rgba(124,147,195,0.10)', glow: 'rgba(124,147,195,0.15)', chart: '#7C93C3' },   // Ice Blue
+        snow: { accent: '#758AB7', text: '#5D6E92', hover: '#6B82B2', dim: 'rgba(124,147,195,0.10)', glow: 'rgba(124,147,195,0.15)', chart: '#7C93C3' },   // Ice Blue
+        ts: { accent: '#7C3AED', text: '#7C3AED', hover: '#6D28D9', dim: 'rgba(124,58,237,0.10)', glow: 'rgba(124,58,237,0.15)', chart: '#7C3AED' },   // Violet Storm
+        tsrain: { accent: '#7C3AED', text: '#7C3AED', hover: '#6D28D9', dim: 'rgba(124,58,237,0.10)', glow: 'rgba(124,58,237,0.15)', chart: '#7C3AED' },
+        rainsnow: { accent: '#758AB7', text: '#5D6E92', hover: '#6B82B2', dim: 'rgba(124,147,195,0.10)', glow: 'rgba(124,147,195,0.15)', chart: '#7C93C3' },  // Ice Blue
+        foggy: { accent: '#64748B', text: '#606F85', hover: '#475569', dim: 'rgba(100,116,139,0.10)', glow: 'rgba(100,116,139,0.15)', chart: '#64748B' },  // Slate
+        windy: { accent: '#0D9488', text: '#0B7C72', hover: '#0F766E', dim: 'rgba(13,148,136,0.10)', glow: 'rgba(13,148,136,0.15)', chart: '#0D9488' }   // Teal
     },
 
     API: Object.freeze({

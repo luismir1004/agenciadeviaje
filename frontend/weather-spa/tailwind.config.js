@@ -13,12 +13,13 @@ module.exports = {
                 ink: {
                     DEFAULT: '#17191E',
                     soft: '#565B64',
-                    faint: '#9BA0A8',
+                    faint: '#6B6E74',
                 },
                 hairline: '#E6E3DB',
                 accent: {
                     DEFAULT: 'var(--brand-accent)',
                     dim: 'var(--brand-dim)',
+                    strong: 'var(--brand-accent-text)',
                 },
                 // Alias heredado del diseño anterior; ahora apunta a paper
                 midnight: '#F6F5F1',

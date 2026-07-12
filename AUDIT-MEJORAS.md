@@ -3,6 +3,8 @@
 **Fecha:** 2026-07-12 · **Estado de partida:** rama con auditoría general remediada, rediseño "Meridian Editorial" y los 11 bugs de la auditoría de bugs corregidos y verificados en navegador.
 **Objetivo:** mapa completo de todo lo que queda por elevar — no hay bugs conocidos pendientes; esto es la hoja de ruta para llevar el proyecto de "portfolio sólido" a "nivel producción".
 
+> **Sprint 1 — COMPLETADO (2026-07-12):** contraste AA (`ink-faint` #6B6E74 = 4.69:1, acentos base ≥3:1 y variante `--brand-accent-text` ≥4.6:1 por tema), `prefers-reduced-motion` (CSS + GSAP timeScale + bucles omitidos), "Guardar Plan" real vía `@media print` + `window.print()`, fuentes Fraunces/Inter self-hosted (200 KB, subset latin, precacheadas por el SW), y el harness e2e promovido a `tests/e2e/` (12 tests, `npm test`) con workflow de GitHub Actions. Verificado: 12/12 tests en verde.
+
 Cada mejora lleva **prioridad** (P0 = hazlo ya, P1 = próxima iteración, P2 = deseable) y **esfuerzo** (S < 1 h · M = medio día · L = 1+ días).
 
 ---

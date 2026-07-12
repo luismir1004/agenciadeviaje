@@ -62,6 +62,14 @@ class WeatherApp {
     #dynamicDeals = null;
 
     constructor() {
+        // prefers-reduced-motion: acelerar todos los tweens de GSAP hasta
+        // ser efectivamente instantáneos SIN perder los onComplete de los
+        // que depende la lógica (preloader, modal). Los bucles infinitos
+        // se omiten individualmente en su punto de creación.
+        if (typeof REDUCED_MOTION !== 'undefined' && REDUCED_MOTION) {
+            gsap.globalTimeline.timeScale(1000);
+        }
+
         // Services Initialization
         this.#cache = new CacheManager(30);
         this.#ui = new UIManager();
@@ -113,8 +121,14 @@ class WeatherApp {
         // Expansión del mapa a pantalla completa
         document.getElementById('map-expand-btn').addEventListener('click', () => this.#toggleMapExpand());
 
+        // Exportación REAL del itinerario: hoja @media print aísla el
+        // contenido del modal y el diálogo del navegador genera el PDF.
         document.getElementById('save-itinerary').addEventListener('click', () => {
-            this.#ui.showToast('Itinerario guardado en PDF (Simulado)', 'success');
+            document.body.classList.add('print-itinerary');
+            window.print();
+        });
+        window.addEventListener('afterprint', () => {
+            document.body.classList.remove('print-itinerary');
         });
 
         // Listen for online/offline events
@@ -145,8 +159,10 @@ class WeatherApp {
             }
         });
 
-        // Mesh gradient parallax on mouse
-        this.#initMeshParallax();
+        // Mesh gradient parallax on mouse (omitido con movimiento reducido)
+        if (typeof REDUCED_MOTION === 'undefined' || !REDUCED_MOTION) {
+            this.#initMeshParallax();
+        }
 
         await this.#initApp();
         this.#initAccessibility();
@@ -425,7 +441,7 @@ class WeatherApp {
                         <span class="city-name font-serif text-lg text-ink group-hover:text-accent transition-colors">${city.name}</span>
                         <span class="text-[10px] text-ink-faint uppercase tracking-widest">${city.country}</span>
                     </div>
-                    ${city.isCapital ? `<span class="text-[9px] font-bold text-accent px-1.5 py-0.5 bg-accent-dim border border-hairline rounded uppercase tracking-tighter ml-auto">Capital</span>` : ''}
+                    ${city.isCapital ? `<span class="text-[9px] font-bold text-accent-strong px-1.5 py-0.5 bg-accent-dim border border-hairline rounded uppercase tracking-tighter ml-auto">Capital</span>` : ''}
                 </div>
                 <i class="fas fa-chevron-right text-ink-faint opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all"></i>
             </div>
@@ -959,7 +975,7 @@ class WeatherApp {
                     <!-- Data Column -->
                     <div class="w-full md:w-1/2 flex flex-col justify-center items-start">
                         <div class="flex items-center gap-3 mb-6 flex-wrap">
-                            <span class="px-3 py-1.5 bg-accent-dim rounded-full text-accent text-[10px] font-bold uppercase tracking-[0.2em]">
+                            <span class="px-3 py-1.5 bg-accent-dim rounded-full text-accent-strong text-[10px] font-bold uppercase tracking-[0.2em]">
                                 Ahora en ${safeCity}
                             </span>
                             <span class="text-ink-faint text-sm font-light">${safeDate}</span>
@@ -969,7 +985,7 @@ class WeatherApp {
                             ${safeMax}<span class="text-4xl md:text-5xl text-ink-faint align-top">°</span>
                         </h2>
 
-                        <div class="text-lg md:text-xl text-accent font-serif italic mb-8 capitalize tracking-wide">
+                        <div class="text-lg md:text-xl text-accent-strong font-serif italic mb-8 capitalize tracking-wide">
                             ${safeDesc}
                         </div>
 
@@ -1022,7 +1038,7 @@ class WeatherApp {
             // Rain badge con probabilidad real derivada de la API
             const rainChance = Number.isFinite(day.rainChance) ? day.rainChance : 0;
             const isRainy = rainChance >= 30 || safeRowWeather.includes('rain') || safeRowWeather.includes('shower') || safeRowWeather.includes('ts');
-            const rainBadge = isRainy ? `<div class="mt-1 flex items-center justify-center gap-1 text-[10px] text-sky-600 font-medium whitespace-nowrap"><i class="fas fa-tint"></i><span class="font-mono">${rainChance}%</span></div>` : '';
+            const rainBadge = isRainy ? `<div class="mt-1 flex items-center justify-center gap-1 text-[10px] text-sky-700 font-medium whitespace-nowrap"><i class="fas fa-tint"></i><span class="font-mono">${rainChance}%</span></div>` : '';
 
             return `
             <div class="forecast-row-3d group relative flex flex-col md:flex-row items-center justify-between px-6 py-5 transition-all duration-300 cursor-pointer w-full">
@@ -1092,6 +1108,7 @@ class WeatherApp {
         const root = document.documentElement.style;
 
         root.setProperty('--brand-accent', theme.accent);
+        root.setProperty('--brand-accent-text', theme.text || theme.accent);
         root.setProperty('--brand-accent-hover', theme.hover);
         root.setProperty('--brand-dim', theme.dim);
         root.setProperty('--brand-glow', theme.glow);
@@ -1146,7 +1163,7 @@ class WeatherApp {
             return `
                 <div class="border-l-2 pl-4 py-2 hover:bg-paper transition-colors rounded-r-lg" style="border-color: var(--brand-accent)">
                 <div class="flex items-center justify-between mb-2">
-                    <h4 class="text-accent font-semibold font-serif text-xl capitalize">${sDate}</h4>
+                    <h4 class="text-accent-strong font-semibold font-serif text-xl capitalize">${sDate}</h4>
                     <div class="flex items-center gap-2 text-sm text-ink-soft">
                         <i class="fas ${sIcon} text-accent"></i>
                         <span>${sTemp}° ${sCond}</span>

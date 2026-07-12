@@ -121,6 +121,8 @@ La aplicación sigue un principio estricto de **Separación de Responsabilidades
 | **Leaflet.js 1.9** | Mapa satelital con tiles CARTO Light. Animaciones `flyTo()` con zoom dinámico al cambiar de ciudad. Popups info con coordenadas. |
 | **FontAwesome 6.4** | Sistema de iconografía climática (☀️→`fa-sun`, 🌧→`fa-cloud-rain`). |
 
+> **Tipografías** (Fraunces + Inter, variables, subset latin) **self-hosted** en `fonts/` — sin dependencia de Google Fonts (menos latencia, sin IP-logging de terceros, cacheables por el SW).
+
 ### APIs Nativas del Navegador
 
 | API | Uso |
@@ -354,6 +356,9 @@ npm install
 
 # Iniciar servidor de desarrollo
 npm run dev
+
+# Ejecutar la suite e2e (Chromium headless, API stubbeada)
+npm test
 ```
 
 La app estará disponible en `http://localhost:5173`.
