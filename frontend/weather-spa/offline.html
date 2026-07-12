@@ -381,20 +381,24 @@
             container.appendChild(fragment);
         })();
 
-        // Mostrar coordenadas reales si están disponibles
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                ({ coords }) => {
-                    const lat = Math.abs(coords.latitude).toFixed(2);
-                    const lon = Math.abs(coords.longitude).toFixed(2);
-                    const latDir = coords.latitude >= 0 ? 'N' : 'S';
-                    const lonDir = coords.longitude >= 0 ? 'E' : 'W';
-                    document.getElementById('coords-display').textContent =
-                        `${lat}°${latDir} · ${lon}°${lonDir} · Sin Señal`;
-                },
-                () => { /* Ignorar error de geolocalización */ },
-                { timeout: 3000 }
-            );
+        // Mostrar coordenadas reales SOLO si el permiso ya fue concedido —
+        // nunca disparar el prompt de geolocalización sin gesto del usuario.
+        if (navigator.permissions && navigator.geolocation) {
+            navigator.permissions.query({ name: 'geolocation' }).then((status) => {
+                if (status.state !== 'granted') return;
+                navigator.geolocation.getCurrentPosition(
+                    ({ coords }) => {
+                        const lat = Math.abs(coords.latitude).toFixed(2);
+                        const lon = Math.abs(coords.longitude).toFixed(2);
+                        const latDir = coords.latitude >= 0 ? 'N' : 'S';
+                        const lonDir = coords.longitude >= 0 ? 'E' : 'W';
+                        document.getElementById('coords-display').textContent =
+                            `${lat}°${latDir} · ${lon}°${lonDir} · Sin Señal`;
+                    },
+                    () => { /* Ignorar error de geolocalización */ },
+                    { timeout: 3000 }
+                );
+            }).catch(() => { /* Permissions API no disponible */ });
         }
 
         // Manejo del reintento con feedback visual

@@ -191,6 +191,11 @@ const APP_CONFIG = {
             'Ámsterdam': {
                 id: '1534351590666-13e3e96b5017',
                 audio: ''
+            },
+            'Tu Ubicación': {
+                // Tierra desde el espacio — imagen neutral para geolocalización
+                id: '1446776877081-d282a0f896e2',
+                audio: ''
             }
         }
     },

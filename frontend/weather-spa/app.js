@@ -121,6 +121,9 @@ class WeatherApp {
         window.addEventListener('online', () => {
             this.#ui.showToast('Conexión restablecida.', 'success');
             this.#setError(false);
+            // Refrescar datos automáticamente al recuperar la conexión
+            const lastCity = this.#cache.getSession('lastCity');
+            this.handleCityChange(lastCity !== null ? lastCity : 0, false);
         });
         window.addEventListener('offline', () => {
             this.#ui.showToast('Sin conexión a internet.', 'error');
@@ -154,19 +157,28 @@ class WeatherApp {
      * They only instantiate when the user scrolls to the forecast section.
      */
     #setupLazyInit() {
+        // B6: cada init aislado en su try/catch — si un CDN falla (Leaflet,
+        // Chart.js), el otro componente debe inicializarse igualmente.
+        const safeInit = () => {
+            if (!this.#mapReady) {
+                try { this.#initMap(); } catch (e) { console.warn('Mapa no disponible:', e); }
+            }
+            if (!this.#chartReady) {
+                try { this.#initChart(); } catch (e) { console.warn('Chart no disponible:', e); }
+            }
+        };
+
         const forecastBento = document.getElementById('forecast-bento');
         if (!forecastBento) {
             // Fallback: init immediately if element not found
-            this.#initMap();
-            this.#initChart();
+            safeInit();
             return;
         }
 
         const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
-                    if (!this.#mapReady) this.#initMap();
-                    if (!this.#chartReady) this.#initChart();
+                    safeInit();
                     observer.unobserve(entry.target);
                 }
             });
@@ -251,8 +263,14 @@ class WeatherApp {
                         this.#toggleCapitalBadge(false);
                         this.offerContainer.classList.add('hidden');
 
-                        await this.loadCityWeather(localCity, false, true, false, signal);
-                        if (!signal.aborted) this.#ui.showToast('Ubicación actualizada.', 'success');
+                        // B8: reflejar la ubicación también en el selector —
+                        // el trigger no debe seguir mostrando la ciudad anterior
+                        const triggerText = document.getElementById('trigger-text');
+                        if (triggerText) triggerText.textContent = 'Tu Ubicación';
+                        document.querySelectorAll('.dropdown-item').forEach(el => el.classList.remove('selected'));
+
+                        const ok = await this.loadCityWeather(localCity, false, true, false, signal);
+                        if (ok && !signal.aborted) this.#ui.showToast('Ubicación actualizada.', 'success');
                         resolve('Success');
                     } catch (e) {
                         reject(e);
@@ -315,7 +333,7 @@ class WeatherApp {
 
         const expand = force !== undefined ? force : !wrapper.classList.contains('map-expanded');
         wrapper.classList.toggle('map-expanded', expand);
-        document.body.classList.toggle('modal-open', expand);
+        this.#syncBodyScrollLock();
 
         const icon = btn.querySelector('i');
         if (icon) icon.className = expand
@@ -346,12 +364,22 @@ class WeatherApp {
             if (this.#map) this.#map.invalidateSize();
         }, 400);
 
+        this.#renderMarker(lat, lon);
+    }
+
+    /**
+     * (Re)dibuja el marcador y su popup con los datos actuales.
+     * Se llama al volar a una ciudad (placeholder con datos previos) y
+     * de nuevo tras el render del forecast, ya con los datos reales (B2).
+     */
+    #renderMarker(lat, lon) {
+        if (!this.#map || isNaN(lat) || isNaN(lon)) return;
+
         // Remove old markers
         this.#map.eachLayer((layer) => {
             if (layer instanceof L.Marker) this.#map.removeLayer(layer);
         });
 
-        // Custom Leaflet DivIcon para el marker Dark Glass con SVG
         const safeWeatherCode = (this.#currentWeatherRaw || 'clear').replace('day', '').replace('night', '');
         const weatherCode = APP_CONFIG.WEATHER_MAP[safeWeatherCode]?.svg || APP_CONFIG.WEATHER_MAP['clear'].svg;
         const markerHtml = `
@@ -375,7 +403,7 @@ class WeatherApp {
             <div class="text-center font-sans tracking-wide">
                 <div class="text-accent font-bold mb-1 text-base font-serif">${sanitize(this.#currentCityName)}</div>
                 <div class="text-ink-soft text-[9px] uppercase tracking-[0.2em] font-bold" id="popup-temp">
-                    ${this.#currentTempRaw !== undefined ? this.#currentTempRaw + '°' : 'LIVE SAT'}
+                    ${this.#currentTempRaw}°
                 </div>
             </div>
         `;
@@ -551,8 +579,14 @@ class WeatherApp {
         this.updateExperience(this.#currentCityName);
 
         // Load Weather (pass signal for cancellation)
-        await this.loadCityWeather(city, true, true, showToast, this.#abortController.signal);
-        this.updateOffer(cityIndex);
+        const signal = this.#abortController.signal;
+        const ok = await this.loadCityWeather(city, true, true, showToast, signal);
+
+        // B3: solo pintar la oferta si ESTA carga terminó bien y sigue vigente.
+        // Un flujo abortado (o fallido) no debe resucitar la oferta de su ciudad.
+        if (ok && !signal.aborted) {
+            this.updateOffer(cityIndex);
+        }
     }
 
     updateExperience(cityName) {
@@ -627,7 +661,7 @@ class WeatherApp {
             }
 
             // Guard: if this request was aborted, stop rendering stale data
-            if (signal && signal.aborted) return;
+            if (signal && signal.aborted) return false;
 
             const dailyForecasts = this.#processForecastData(data, city);
             this.#currentForecast = dailyForecasts;
@@ -643,23 +677,43 @@ class WeatherApp {
 
             this.#renderForecast(validatedForecasts);
 
-            // Chart may not be initialized yet if user hasn't scrolled
+            // B2: refrescar marcador/popup del mapa AHORA que los datos
+            // reales existen (el updateMap inicial usó los del render previo)
+            this.#renderMarker(city.coords.lat, city.coords.lon);
+
+            // Chart may not be initialized yet if user hasn't scrolled.
+            // B6: un fallo del chart (p.ej. CDN caído) no debe convertirse
+            // en un falso "error de conexión" teniendo datos válidos.
             if (this.#chartReady && this.#chart) {
-                this.#chart.render(validatedForecasts);
+                try {
+                    this.#chart.render(validatedForecasts);
+                } catch (chartError) {
+                    console.warn('Chart no disponible:', chartError);
+                }
             } else {
                 this.#pendingChartData = validatedForecasts;
             }
 
+            // B1: el CTA se oculta con la clase `hidden` (display:none) en
+            // setLoading(true); animar opacidad no basta — hay que quitarla.
+            this.ctaContainer.classList.remove('hidden');
             gsap.to(this.ctaContainer, { opacity: 1, duration: 1, delay: 0.5 });
+
+            return true;
 
         } catch (error) {
             // Silently ignore aborted requests (user changed city)
-            if (error.name === 'AbortError') return;
+            if (error.name === 'AbortError') return false;
 
             this.#setError(true);
             this.#ui.showToast('Error de conexión con el satélite.', 'error');
+            return false;
         } finally {
-            this.setLoading(false);
+            // B4: si ESTA petición fue abortada, los skeletons visibles
+            // pertenecen al flujo nuevo — no debemos retirárselos.
+            if (!signal || !signal.aborted) {
+                this.setLoading(false);
+            }
         }
     }
 
@@ -747,7 +801,14 @@ class WeatherApp {
         if (!response.ok) {
             const error = new Error(`API Error: HTTP ${response.status}`);
             error.status = response.status;
-            error.retryable = response.status >= 500 || response.status === 0;
+
+            // B5: el Service Worker responde 503 con X-SW-Offline cuando no
+            // hay red. Reintentar contra esa respuesta sintética (o estando
+            // navigator.onLine=false) solo quema ~3s de backoff — ir directo
+            // al fallback local (IndexedDB).
+            const isOffline = response.headers.get('X-SW-Offline') === 'true'
+                || navigator.onLine === false;
+            error.retryable = !isOffline && (response.status >= 500 || response.status === 0);
             throw error;
         }
 
@@ -1007,15 +1068,17 @@ class WeatherApp {
             `;
         }).join('');
 
-        // Staggered entrance — cinematic cascade from below
+        // Staggered entrance — cinematic cascade from below.
+        // B7: clearProps al terminar — el transform inline que deja GSAP
+        // anularía el :hover CSS de las filas (translateX en hover).
         gsap.fromTo('#bento-main > div',
             { opacity: 0, y: 40, scale: 0.97, filter: 'blur(8px)' },
-            { opacity: 1, y: 0, scale: 1, filter: 'blur(0px)', duration: 1.4, ease: "expo.out" }
+            { opacity: 1, y: 0, scale: 1, filter: 'blur(0px)', duration: 1.4, ease: "expo.out", clearProps: 'transform,filter' }
         );
 
         gsap.fromTo('.forecast-row-3d',
             { opacity: 0, y: 20, filter: 'blur(6px)' },
-            { opacity: 1, y: 0, filter: 'blur(0px)', stagger: 0.1, duration: 0.8, ease: "power3.out", delay: 0.4 }
+            { opacity: 1, y: 0, filter: 'blur(0px)', stagger: 0.1, duration: 0.8, ease: "power3.out", delay: 0.4, clearProps: 'transform,filter' }
         );
     }
 
@@ -1064,7 +1127,8 @@ class WeatherApp {
     }
 
     showItinerary() {
-        if (!this.#currentForecast) return;
+        // B11: [] es truthy — sin días no hay itinerario que mostrar
+        if (!this.#currentForecast?.length) return;
 
         const plan = this.#itinerary.generate(this.#currentCityName, this.#currentForecast);
         document.getElementById('modal-city-name').textContent = this.#currentCityName;
@@ -1100,19 +1164,30 @@ class WeatherApp {
         this.toggleModal(true);
     }
 
+    /**
+     * El scroll del body se bloquea si el modal O el mapa expandido están
+     * activos. Sincronizar por estado combinado evita que cerrar uno
+     * desbloquee el scroll mientras el otro sigue abierto.
+     */
+    #syncBodyScrollLock() {
+        const mapExpanded = document.getElementById('map-wrapper')?.classList.contains('map-expanded');
+        const modalOpen = !this.modal.classList.contains('hidden');
+        document.body.classList.toggle('modal-open', !!mapExpanded || modalOpen);
+    }
+
     toggleModal(show) {
         if (show) {
             this.lastFocusedElement = document.activeElement;
             this.modal.classList.remove('hidden');
-            document.body.classList.add('modal-open');
+            this.#syncBodyScrollLock();
             gsap.to(this.modalContent, { scale: 1, opacity: 1, duration: 0.4, ease: 'power2.out' });
             // Mover el foco dentro del diálogo (a11y)
             this.closeModalBtn.focus();
         } else {
-            document.body.classList.remove('modal-open');
             gsap.to(this.modalContent, {
                 scale: 0.95, opacity: 0, duration: 0.3, onComplete: () => {
                     this.modal.classList.add('hidden');
+                    this.#syncBodyScrollLock();
                 }
             });
             // Devolver el foco al elemento que abrió el modal (a11y)
@@ -1270,7 +1345,7 @@ class WeatherApp {
             opacity: 0, duration: 0.3, onComplete: () => {
                 this.offerContainer.innerHTML = `
                 <div class="offer-card flex flex-col md:flex-row items-center w-full group my-6 md:my-10">
-                    <img src="${safeImage}" alt="${safeTitle}" class="offer-card-bg" />
+                    ${safeImage ? `<img src="${safeImage}" alt="${safeTitle}" class="offer-card-bg" />` : ''}
                         <div class="offer-card-overlay pointer-events-none"></div>
 
                         <div class="offer-card-content flex flex-col md:flex-row items-center justify-between w-full p-10 md:p-20 text-white gap-10 md:gap-16 w-full">

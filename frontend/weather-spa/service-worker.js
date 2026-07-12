@@ -24,7 +24,7 @@
  * ╚═══════════════════════════════════════════════════════════════╝
  */
 
-const CACHE_VERSION = 'nextgen-v6';
+const CACHE_VERSION = 'nextgen-v7';
 const OFFLINE_PAGE = './offline.html';
 
 // ─────────────────────────────────────────────────────────────────
@@ -35,6 +35,7 @@ const APP_SHELL = [
     './index.html',
     './offline.html',
     './styles.css',
+    './styles.css?v=3',      // la página lo pide con query — clave de caché distinta (B9)
     './tailwind-dist.css',
     './app.js',
     './manifest.json',

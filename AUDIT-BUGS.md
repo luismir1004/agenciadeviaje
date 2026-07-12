@@ -1,5 +1,10 @@
 # Auditoría de Bugs — NextGen Europa Weather SPA
 
+> **Estado de remediación (2026-07-12):** los 11 bugs (B1–B11) y los menores 1–7 fueron
+> **corregidos y re-verificados en navegador** con el mismo harness que los detectó
+> (ver commit posterior al informe). El menor 8 (icons immutable) queda como nota de
+> precaución operativa, sin cambio de código.
+
 **Fecha:** 2026-07-12 · **Alcance:** estado actual de la rama (post-remediación de la auditoría general y post-rediseño "Meridian Editorial")
 **Método:** revisión estática línea a línea de `app.js` + servicios, y **verificación dinámica en Chromium** (Playwright, CDNs servidos byte-idénticos desde npm, API 7Timer stubbeada con temperaturas distintas por ciudad para detectar datos obsoletos, geolocalización simulada). Cada bug marcado ✅ fue reproducido en navegador; los marcados 🔍 están confirmados por análisis del código con escenario de fallo concreto.
 

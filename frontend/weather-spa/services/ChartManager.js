@@ -23,11 +23,6 @@ class ChartManager {
         const labels = dailyForecasts.map(d => d.dayName.substring(0, 3));
         const maxTemps = dailyForecasts.map(d => d.max);
         const minTemps = dailyForecasts.map(d => d.min);
-        const weatherMeta = dailyForecasts.map(d => ({
-            icon: d.icon || 'fa-sun',
-            desc: d.desc || 'Despejado',
-            weather: d.weather || 'clear'
-        }));
 
         if (this.#chartInstance) {
             this.#chartInstance.destroy();
