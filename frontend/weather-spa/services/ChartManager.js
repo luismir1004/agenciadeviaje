@@ -77,7 +77,9 @@ class ChartManager {
                 const animate = () => {
                     if (chart._drawProgress < 1) {
                         chart._drawProgress += 0.02;
-                        chart.update('none');
+                        // draw() re-pinta sin recalcular layout/escalas
+                        // (update('none') era mucho más costoso por frame)
+                        chart.draw();
                         requestAnimationFrame(animate);
                     }
                 };

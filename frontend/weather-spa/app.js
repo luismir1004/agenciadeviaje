@@ -94,6 +94,25 @@ class WeatherApp {
         this.btnGenerate.addEventListener('click', () => this.showItinerary());
         this.closeModalBtn.addEventListener('click', () => this.toggleModal(false));
 
+        // Modal: cerrar con click en backdrop y con Escape
+        document.getElementById('modal-backdrop').addEventListener('click', () => this.toggleModal(false));
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            if (!this.modal.classList.contains('hidden')) {
+                this.toggleModal(false);
+            } else if (document.getElementById('map-wrapper')?.classList.contains('map-expanded')) {
+                this.#toggleMapExpand(false);
+            }
+        });
+
+        // Geolocalización bajo demanda (gesto explícito del usuario)
+        document.getElementById('locate-btn').addEventListener('click', () => {
+            this.#detectUserLocation().catch(() => { });
+        });
+
+        // Expansión del mapa a pantalla completa
+        document.getElementById('map-expand-btn').addEventListener('click', () => this.#toggleMapExpand());
+
         document.getElementById('save-itinerary').addEventListener('click', () => {
             this.#ui.showToast('Itinerario guardado en PDF (Simulado)', 'success');
         });
@@ -193,17 +212,23 @@ class WeatherApp {
         } else {
             this.#hero.animateEntrance();
         }
-
-        this.#detectUserLocation()
-            .catch(() => { });
     }
 
+    /**
+     * Geolocalización bajo demanda (gesto del usuario, no automática).
+     * Comparte el AbortController del flujo de ciudades: si el usuario
+     * selecciona una ciudad mientras esto está en vuelo, se aborta y
+     * nunca sobrescribe datos más recientes.
+     */
     #detectUserLocation() {
         return new Promise((resolve, reject) => {
             if (!navigator.geolocation) {
+                this.#ui.showToast('Tu navegador no soporta geolocalización.', 'error');
                 reject(new Error('Geolocation not supported'));
                 return;
             }
+
+            this.#ui.showToast('📍 Localizando...', 'info');
 
             navigator.geolocation.getCurrentPosition(
                 async (pos) => {
@@ -212,30 +237,43 @@ class WeatherApp {
                         name: 'Tu Ubicación',
                         coords: { lat: latitude, lon: longitude }
                     };
+
+                    // Cancelar cualquier fetch pendiente y reservar un signal propio
+                    if (this.#abortController) this.#abortController.abort();
+                    this.#abortController = new AbortController();
+                    const signal = this.#abortController.signal;
+
                     this.#currentCityName = localCity.name;
 
                     try {
-                        this.#ui.showToast('📍 Localizando...', 'info');
                         this.#hero.updateCity(localCity.name);
                         this.updateExperience(localCity.name);
+                        this.#toggleCapitalBadge(false);
+                        this.offerContainer.classList.add('hidden');
 
-                        await this.loadCityWeather(localCity, false, false);
-                        this.#ui.showToast('Ubicación actualizada.', 'success');
+                        await this.loadCityWeather(localCity, false, true, false, signal);
+                        if (!signal.aborted) this.#ui.showToast('Ubicación actualizada.', 'success');
                         resolve('Success');
                     } catch (e) {
                         reject(e);
                     }
                 },
                 (err) => {
+                    this.#ui.showToast('No se pudo obtener tu ubicación.', 'error');
                     reject(new Error(`Geolocation error: ${err.message}`));
                 },
                 {
                     enableHighAccuracy: true,
-                    timeout: 2500,
-                    maximumAge: 0
+                    timeout: 8000,
+                    maximumAge: 60000
                 }
             );
         });
+    }
+
+    #toggleCapitalBadge(isCapital) {
+        const badge = document.getElementById('capital-badge');
+        if (badge) badge.classList.toggle('hidden', !isCapital);
     }
 
     #initMap() {
@@ -264,6 +302,32 @@ class WeatherApp {
             });
             observer.observe(mapContainer);
         }
+    }
+
+    /**
+     * Expande/colapsa el mapa a pantalla completa.
+     * @param {boolean} [force] - true/false fuerza estado; undefined alterna
+     */
+    #toggleMapExpand(force) {
+        const wrapper = document.getElementById('map-wrapper');
+        const btn = document.getElementById('map-expand-btn');
+        if (!wrapper || !btn) return;
+
+        const expand = force !== undefined ? force : !wrapper.classList.contains('map-expanded');
+        wrapper.classList.toggle('map-expanded', expand);
+        document.body.classList.toggle('modal-open', expand);
+
+        const icon = btn.querySelector('i');
+        if (icon) icon.className = expand
+            ? 'fas fa-compress-arrows-alt transition-transform group-hover:scale-110'
+            : 'fas fa-expand-arrows-alt transition-transform group-hover:scale-110';
+        btn.setAttribute('aria-label', expand ? 'Contraer Mapa' : 'Expandir Mapa');
+
+        // Asegurar que Leaflet exista y recalcule el viewport tras la transición
+        if (expand && !this.#mapReady) this.#initMap();
+        setTimeout(() => {
+            if (this.#map) this.#map.invalidateSize();
+        }, 350);
     }
 
     updateMap(lat, lon) {
@@ -309,7 +373,7 @@ class WeatherApp {
 
         const popupContent = `
             <div class="text-center font-sans tracking-wide">
-                <div class="text-blue-400 font-bold mb-1 text-base">${this.#currentCityName}</div>
+                <div class="text-blue-400 font-bold mb-1 text-base">${sanitize(this.#currentCityName)}</div>
                 <div class="text-white/60 text-[9px] uppercase tracking-[0.2em] font-bold" id="popup-temp">
                     ${this.#currentTempRaw !== undefined ? this.#currentTempRaw + '°' : 'LIVE SAT'}
                 </div>
@@ -474,6 +538,7 @@ class WeatherApp {
         if (!city) return;
 
         this.#currentCityName = city.name;
+        this.#toggleCapitalBadge(!!city.isCapital);
 
         // Persist selected city for session continuity
         this.#cache.saveSession('lastCity', cityIndex);
@@ -564,7 +629,7 @@ class WeatherApp {
             // Guard: if this request was aborted, stop rendering stale data
             if (signal && signal.aborted) return;
 
-            const dailyForecasts = this.#processForecastData(data.dataseries, city);
+            const dailyForecasts = this.#processForecastData(data, city);
             this.#currentForecast = dailyForecasts;
 
             const validatedForecasts = this.#validateForecastData(dailyForecasts);
@@ -620,7 +685,7 @@ class WeatherApp {
 
         console.warn('⚠️ Initiating Open-Meteo Fallback API...');
 
-        const url = `${APP_CONFIG.API.OPENMETEO_BASE_URL}?latitude=${safeLat}&longitude=${safeLon}&daily=temperature_2m_max,temperature_2m_min,weathercode&timezone=auto`;
+        const url = `${APP_CONFIG.API.OPENMETEO_BASE_URL}?latitude=${safeLat}&longitude=${safeLon}&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_probability_max&timezone=auto`;
         const response = await fetch(url, signal ? { signal } : undefined);
 
         if (!response.ok) {
@@ -637,10 +702,12 @@ class WeatherApp {
                 const max = json.daily.temperature_2m_max[i];
                 const min = json.daily.temperature_2m_min[i];
                 const code = json.daily.weathercode[i];
+                const rainProb = json.daily.precipitation_probability_max?.[i];
 
                 let weather = 'clear';
                 if (code >= 1 && code <= 2) weather = 'pcloudy';
                 else if (code === 3) weather = 'cloudy';
+                else if (code >= 45 && code <= 48) weather = 'foggy';
                 else if (code >= 51 && code <= 67) weather = 'rain';
                 else if (code >= 71 && code <= 77) weather = 'snow';
                 else if (code >= 95) weather = 'ts';
@@ -650,8 +717,9 @@ class WeatherApp {
                 let offsetHours = Math.round((targetTime - now) / 3600000);
                 if (offsetHours < 0) offsetHours = 0;
 
-                dataseries.push({ timepoint: offsetHours, temp2m: max, weather });
-                dataseries.push({ timepoint: offsetHours + 6, temp2m: min, weather });
+                const rain_prob = typeof rainProb === 'number' ? rainProb : undefined;
+                dataseries.push({ timepoint: offsetHours, temp2m: max, weather, rain_prob });
+                dataseries.push({ timepoint: offsetHours + 6, temp2m: min, weather, rain_prob });
             });
         }
         return { dataseries };
@@ -683,7 +751,9 @@ class WeatherApp {
         return await response.json();
     }
 
-    #processForecastData(series, city) {
+    #processForecastData(data, city) {
+        const series = data?.dataseries;
+
         // Guard: API returned null/undefined dataseries
         if (!Array.isArray(series) || series.length === 0) {
             console.warn('API returned empty or invalid dataseries');
@@ -691,11 +761,18 @@ class WeatherApp {
         }
 
         const tz = city.timezone || 'UTC';
-        const todayStr = new Date().toLocaleString('en-US', { timeZone: tz });
-        const today = new Date(todayStr);
+
+        // 7Timer's `timepoint` is an offset in hours from the model init
+        // time (`init` = "YYYYMMDDHH" in UTC), NOT from "now". Anchor the
+        // buckets to init when available; fall back to now (Open-Meteo path).
+        let base = new Date();
+        const initMatch = typeof data.init === 'string' && data.init.match(/^(\d{4})(\d{2})(\d{2})(\d{2})$/);
+        if (initMatch) {
+            base = new Date(Date.UTC(+initMatch[1], +initMatch[2] - 1, +initMatch[3], +initMatch[4]));
+        }
 
         const getDateFromOffset = (offsetHours) => {
-            const date = new Date(today.getTime() + offsetHours * 60 * 60 * 1000);
+            const date = new Date(base.getTime() + offsetHours * 60 * 60 * 1000);
 
             const formatterDate = new Intl.DateTimeFormat('es-ES', {
                 timeZone: tz, day: 'numeric', month: 'short'
@@ -718,7 +795,9 @@ class WeatherApp {
         const dailyData = {};
         series.forEach(point => {
             const { key, dayName, fullDate } = getDateFromOffset(point.timepoint);
-            if (!dailyData[key]) dailyData[key] = { dayName, date: fullDate, temps: [], weathers: [] };
+            if (!dailyData[key]) {
+                dailyData[key] = { dayName, date: fullDate, temps: [], weathers: [], precipPoints: 0, totalPoints: 0, rainProbs: [] };
+            }
 
             // Filter invalid temperatures: -9999 sentinel, null, undefined
             if (point.temp2m !== -9999 && point.temp2m !== null && point.temp2m !== undefined) {
@@ -729,6 +808,12 @@ class WeatherApp {
             if (point.weather) {
                 dailyData[key].weathers.push(point.weather);
             }
+
+            // Precipitation signal: 7Timer exposes prec_type ('rain'|'snow'|'none'),
+            // the Open-Meteo fallback attaches a real rain_prob percentage.
+            dailyData[key].totalPoints++;
+            if (point.prec_type && point.prec_type !== 'none') dailyData[key].precipPoints++;
+            if (typeof point.rain_prob === 'number') dailyData[key].rainProbs.push(point.rain_prob);
         });
 
         // STEP 2: Normalize — apply fallbacks AFTER all chunks are processed
@@ -753,12 +838,19 @@ class WeatherApp {
 
             const safeWeather = dominantWeather.replace('day', '').replace('night', '');
 
+            // Rain chance: real probability from Open-Meteo if present;
+            // otherwise share of 3h-slots with precipitation (7Timer).
+            const rainChance = day.rainProbs.length > 0
+                ? Math.max(...day.rainProbs)
+                : (day.totalPoints > 0 ? Math.round((day.precipPoints / day.totalPoints) * 100) : 0);
+
             return {
                 dayName: day.dayName,
                 date: day.date,
                 max: maxTemp,
                 min: minTemp,
                 weather: safeWeather,
+                rainChance,
                 ...(APP_CONFIG.WEATHER_MAP[safeWeather] || APP_CONFIG.WEATHER_MAP['clear'])
             };
         });
@@ -824,8 +916,8 @@ class WeatherApp {
                                 <span class="text-2xl text-white/90 font-light">${safeMin}°</span>
                             </div>
                             <div>
-                                <span class="block text-[10px] uppercase tracking-[0.15em] mb-1 font-semibold text-white/50">Prob. Lluvia</span>
-                                <span class="text-2xl text-white/90 font-light">${today.weather.includes('rain') || today.weather.includes('shower') || today.weather.includes('ts') ? '80%' : (today.weather === 'clear' ? '0%' : '30%')}</span>
+                                <span class="block text-[10px] uppercase tracking-[0.15em] mb-1 font-semibold text-white/50">Prob. Precip.</span>
+                                <span class="text-2xl text-white/90 font-light">${Number.isFinite(today.rainChance) ? today.rainChance : 0}%</span>
                             </div>
                         </div>
                     </div>
@@ -844,7 +936,7 @@ class WeatherApp {
         const weekMin = Math.min(...upcoming.map(d => d.min));
 
         this.bentoList.innerHTML = upcoming.map((day) => {
-            // Sanitizar valores de cada día del pronóstico
+            // Sanitizar valores de cada día del pronóstico (solo para display)
             const sDate = sanitize(day.date);
             const sDayName = sanitize(day.dayName);
             const sWeather = sanitize(day.weather);
@@ -855,13 +947,16 @@ class WeatherApp {
             const sMax = sanitize(day.max, 'number');
             const sMin = sanitize(day.min, 'number');
 
+            // Aritmética SIEMPRE sobre los números crudos ya validados
+            // (sanitize puede devolver '—' y produciría NaN en los estilos)
             const range = weekMax - weekMin || 1;
-            const leftOffset = ((sMin - weekMin) / range) * 100;
-            const barWidth = ((sMax - sMin) / range) * 100;
+            const leftOffset = ((day.min - weekMin) / range) * 100;
+            const barWidth = ((day.max - day.min) / range) * 100;
 
-            // Logic for visual Rain Badge
-            const isRainy = safeRowWeather.includes('rain') || safeRowWeather.includes('shower') || safeRowWeather.includes('ts');
-            const rainBadge = isRainy ? `<div class="mt-1 flex items-center justify-center gap-1 text-[10px] text-sky-400 font-medium whitespace-nowrap"><i class="fas fa-tint"></i><span class="font-mono">80%</span></div>` : '';
+            // Rain badge con probabilidad real derivada de la API
+            const rainChance = Number.isFinite(day.rainChance) ? day.rainChance : 0;
+            const isRainy = rainChance >= 30 || safeRowWeather.includes('rain') || safeRowWeather.includes('shower') || safeRowWeather.includes('ts');
+            const rainBadge = isRainy ? `<div class="mt-1 flex items-center justify-center gap-1 text-[10px] text-sky-400 font-medium whitespace-nowrap"><i class="fas fa-tint"></i><span class="font-mono">${rainChance}%</span></div>` : '';
 
             return `
             <div class="forecast-row-3d group relative flex flex-col md:flex-row items-center justify-between p-5 mb-4 rounded-2xl transition-all duration-500 cursor-pointer w-full overflow-hidden">
@@ -1021,9 +1116,12 @@ class WeatherApp {
 
     toggleModal(show) {
         if (show) {
+            this.lastFocusedElement = document.activeElement;
             this.modal.classList.remove('hidden');
             document.body.classList.add('modal-open');
             gsap.to(this.modalContent, { scale: 1, opacity: 1, duration: 0.4, ease: 'power2.out' });
+            // Mover el foco dentro del diálogo (a11y)
+            this.closeModalBtn.focus();
         } else {
             document.body.classList.remove('modal-open');
             gsap.to(this.modalContent, {
@@ -1031,6 +1129,10 @@ class WeatherApp {
                     this.modal.classList.add('hidden');
                 }
             });
+            // Devolver el foco al elemento que abrió el modal (a11y)
+            if (this.lastFocusedElement && typeof this.lastFocusedElement.focus === 'function') {
+                this.lastFocusedElement.focus();
+            }
         }
     }
 
@@ -1120,11 +1222,17 @@ class WeatherApp {
                     ? 'No hay conexión a internet. Conéctate a una red y vuelve a intentarlo.'
                     : 'No pudimos conectar con los servicios meteorológicos. Por favor, inténtalo de nuevo.'}
                     </p>
-                    <button onclick="document.querySelector('#city-trigger').click()" class="btn-luxury-outline text-sm">
+                    <button id="error-retry-btn" class="btn-luxury-outline text-sm">
                         <i class="fas fa-rotate-right mr-2"></i> Reintentar
                     </button>
                 </div>
                 `;
+
+            // Listener explícito (sin onclick inline — compatible con CSP)
+            this.errorState.querySelector('#error-retry-btn').addEventListener('click', () => {
+                const lastCity = this.#cache.getSession('lastCity');
+                this.handleCityChange(lastCity !== null ? lastCity : 0);
+            });
 
             this.errorState.classList.remove('hidden');
             gsap.fromTo(this.errorState,
@@ -1148,6 +1256,17 @@ class WeatherApp {
         }
     }
 
+    /**
+     * Valida que una URL sea segura para inyectar en href/src:
+     * solo anchors (#), rutas relativas/absolutas del sitio, o https.
+     */
+    #safeUrl(url, fallback = '#') {
+        const str = String(url || '');
+        if (/^(#|\/(?!\/)|\.\/)/.test(str)) return str.replace(/"/g, '%22');
+        if (/^https:\/\//i.test(str)) return str.replace(/"/g, '%22');
+        return fallback;
+    }
+
     updateOffer(cityIndex) {
         const deal = (this.#dynamicDeals || APP_CONFIG.CITY_DEALS)[cityIndex];
         if (!deal) {
@@ -1155,11 +1274,17 @@ class WeatherApp {
             return;
         }
 
+        // Sanitizar: deals.json llega por fetch y podría ser manipulado
+        const safeTitle = sanitize(deal.title);
+        const safePrice = sanitize(deal.price);
+        const safeImage = this.#safeUrl(deal.image, '');
+        const safeLink = this.#safeUrl(deal.link, '#');
+
         gsap.to(this.offerContainer, {
             opacity: 0, duration: 0.3, onComplete: () => {
                 this.offerContainer.innerHTML = `
                 <div class="offer-card flex flex-col md:flex-row items-center w-full group my-6 md:my-10">
-                    <img src="${deal.image}" alt="${deal.title}" class="offer-card-bg" />
+                    <img src="${safeImage}" alt="${safeTitle}" class="offer-card-bg" />
                         <div class="offer-card-overlay pointer-events-none"></div>
 
                         <div class="offer-card-content flex flex-col md:flex-row items-center justify-between w-full p-10 md:p-20 text-white gap-10 md:gap-16 w-full">
@@ -1168,16 +1293,16 @@ class WeatherApp {
                                     <div class="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
                                     <span class="text-blue-400 font-bold uppercase tracking-[0.4em] text-[11px] md:text-xs">Plan Corporativo</span>
                                 </div>
-                                <h3 class="text-4xl md:text-6xl font-serif italic font-medium mb-6 tracking-tight text-white leading-tight">${deal.title}</h3>
+                                <h3 class="text-4xl md:text-6xl font-serif italic font-medium mb-6 tracking-tight text-white leading-tight">${safeTitle}</h3>
                                 <p class="text-white/60 font-light text-lg md:text-xl max-w-xl leading-relaxed">Conexiones directas, suites ejecutivas y eficiencia pura para el viajero de negocios.</p>
                             </div>
 
                             <div class="flex flex-col items-center md:items-end gap-6 shrink-0 md:w-1/3 md:pl-16 border-t md:border-t-0 md:border-l border-white/10 pt-8 md:pt-0">
                                 <div class="text-center md:text-right">
                                     <span class="text-[10px] md:text-sm text-white/30 block uppercase tracking-[0.4em] font-bold mb-4">Tarifa de Gestión</span>
-                                    <span class="text-7xl md:text-8xl lg:text-[8rem] font-sans font-thin text-white tracking-tighter leading-none">${deal.price}</span>
+                                    <span class="text-7xl md:text-8xl lg:text-[8rem] font-sans font-thin text-white tracking-tighter leading-none">${safePrice}</span>
                                 </div>
-                                <a href="${deal.link}" target="_blank" rel="noopener noreferrer" class="btn-luxury w-full md:w-auto text-center mt-6 text-base md:text-lg px-12 py-5 tracking-widest uppercase font-semibold relative z-50">
+                                <a href="${safeLink}" target="_blank" rel="noopener noreferrer" class="btn-luxury w-full md:w-auto text-center mt-6 text-base md:text-lg px-12 py-5 tracking-widest uppercase font-semibold relative z-50">
                                     <span>Iniciar Proceso</span>
                                 </a>
                             </div>
@@ -1200,23 +1325,48 @@ class WeatherApp {
 
         let targetX = 0, targetY = 0;
         let currentX = 0, currentY = 0;
+        let rafId = null;
 
-        document.addEventListener('mousemove', (e) => {
-            targetX = (e.clientX / window.innerWidth - 0.5) * 30;
-            targetY = (e.clientY / window.innerHeight - 0.5) * 20;
-        });
-
+        // El bucle rAF solo corre mientras hay movimiento pendiente;
+        // se detiene al converger para no quemar CPU en reposo.
         const animate = () => {
             currentX += (targetX - currentX) * 0.05;
             currentY += (targetY - currentY) * 0.05;
             meshBg.style.transform = `translate(${currentX}px, ${currentY}px)`;
-            requestAnimationFrame(animate);
+
+            if (Math.abs(targetX - currentX) > 0.05 || Math.abs(targetY - currentY) > 0.05) {
+                rafId = requestAnimationFrame(animate);
+            } else {
+                rafId = null;
+            }
         };
-        requestAnimationFrame(animate);
+
+        document.addEventListener('mousemove', (e) => {
+            targetX = (e.clientX / window.innerWidth - 0.5) * 30;
+            targetY = (e.clientY / window.innerHeight - 0.5) * 20;
+            if (rafId === null) rafId = requestAnimationFrame(animate);
+        });
     }
 }
 
-// El Service Worker se registra en index.html usando requestIdleCallback
 document.addEventListener('DOMContentLoaded', () => {
     new WeatherApp();
 });
+
+// ═══════════════════════════════════════════════════════════════
+// Registro del Service Worker — diferido tras `load` con
+// requestIdleCallback para no competir con el LCP del hero.
+// ═══════════════════════════════════════════════════════════════
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        const registerSW = () => {
+            navigator.serviceWorker.register('./service-worker.js')
+                .catch(err => console.warn('[PWA] Registro de SW fallido:', err));
+        };
+        if ('requestIdleCallback' in window) {
+            requestIdleCallback(registerSW, { timeout: 3000 });
+        } else {
+            setTimeout(registerSW, 1000);
+        }
+    });
+}

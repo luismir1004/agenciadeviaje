@@ -8,8 +8,10 @@
  * ║  ┌──────────────────────────┬──────────────────────────────┐ ║
  * ║  │ Resource Type            │ Strategy                     │ ║
  * ║  ├──────────────────────────┼──────────────────────────────┤ ║
- * ║  │ App Shell (HTML, CSS,    │ Cache First →                │ ║
- * ║  │ JS local, Icons)         │ Network Fallback             │ ║
+ * ║  │ Navegaciones (HTML)      │ Network First → Cache        │ ║
+ * ║  ├──────────────────────────┼──────────────────────────────┤ ║
+ * ║  │ App Shell (CSS, JS       │ Stale-While-Revalidate       │ ║
+ * ║  │ local, Icons)            │ (deploys llegan solos)       │ ║
  * ║  ├──────────────────────────┼──────────────────────────────┤ ║
  * ║  │ CDN (Fonts, FA, GSAP,    │ Stale-While-Revalidate       │ ║
  * ║  │ Chart.js, Leaflet)       │ (serve cache + bg update)    │ ║
@@ -22,7 +24,7 @@
  * ╚═══════════════════════════════════════════════════════════════╝
  */
 
-const CACHE_VERSION = 'nextgen-v4';
+const CACHE_VERSION = 'nextgen-v5';
 const OFFLINE_PAGE = './offline.html';
 
 // ─────────────────────────────────────────────────────────────────
@@ -37,8 +39,13 @@ const APP_SHELL = [
     './app.js',
     './manifest.json',
     './favicon.ico',
+    './data/deals.json',
     './icons/icon-192x192.svg',
     './icons/icon-512x512.svg',
+    './icons/icon-192x192.png',
+    './icons/icon-512x512.png',
+    './icons/icon-512x512-maskable.png',
+    './icons/apple-touch-icon.png',
     './services/Config.js',
     './services/CacheManager.js',
     './services/ChartManager.js',
@@ -53,9 +60,7 @@ const APP_SHELL = [
 // Sirve caché instantáneamente, actualiza en background
 // ─────────────────────────────────────────────────────────────────
 const CDN_PATTERNS = [
-    'cdnjs.cloudflare.com/ajax/libs/font-awesome',
-    'cdnjs.cloudflare.com/ajax/libs/gsap',
-    'cdn.jsdelivr.net/npm/chart.js',
+    'cdn.jsdelivr.net',       // Chart.js, GSAP, Font Awesome, localforage
     'fonts.googleapis.com',
     'fonts.gstatic.com',
     'unpkg.com/leaflet',
@@ -153,13 +158,22 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // ④ App Shell (mismo origen) → Cache First
-    if (url.origin === self.location.origin) {
-        event.respondWith(cacheFirst(request));
+    // ④ Navegaciones (HTML) → Network First
+    //    El documento siempre intenta llegar fresco; el caché es fallback.
+    if (request.mode === 'navigate') {
+        event.respondWith(networkFirst(request));
         return;
     }
 
-    // ⑤ Default: red directa
+    // ⑤ App Shell (mismo origen) → Stale-While-Revalidate
+    //    Sirve rápido desde caché pero SIEMPRE revalida en background,
+    //    así los despliegues nuevos llegan sin bumpear CACHE_VERSION.
+    if (url.origin === self.location.origin) {
+        event.respondWith(staleWhileRevalidate(request));
+        return;
+    }
+
+    // ⑥ Default: red directa
     event.respondWith(fetch(request).catch(() => offlineFallback(request)));
 });
 
@@ -285,11 +299,11 @@ async function offlineFallback(request) {
                <p style="color:#94a3b8;margin-bottom:1.5rem">
                  No hay conexión a internet.<br>Los datos meteorológicos no están disponibles offline.
                </p>
-               <button onclick="location.reload()" 
-                 style="background:#2563EB;color:#fff;border:none;padding:0.75rem 1.5rem;
-                 border-radius:100px;cursor:pointer;font-size:0.875rem;">
+               <a href="./"
+                 style="display:inline-block;background:#2563EB;color:#fff;text-decoration:none;
+                 padding:0.75rem 1.5rem;border-radius:100px;cursor:pointer;font-size:0.875rem;">
                  Reintentar
-               </button>
+               </a>
              </div></body></html>`,
             { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
         );

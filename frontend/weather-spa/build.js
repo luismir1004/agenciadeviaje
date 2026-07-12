@@ -41,6 +41,10 @@ const COPY_FILES = [
     'favicon.ico',
     'icons/icon-192x192.svg',
     'icons/icon-512x512.svg',
+    'icons/icon-192x192.png',
+    'icons/icon-512x512.png',
+    'icons/icon-512x512-maskable.png',
+    'icons/apple-touch-icon.png',
     'tailwind-dist.css',
     'data/deals.json'
 ];

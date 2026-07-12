@@ -764,3 +764,20 @@ body.modal-open {
     background: linear-gradient(180deg, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.4) 100%);
     box-shadow: -2px 0 4px rgba(255, 255, 255, 0.8);
 }
+/* ═══════════════════════════════════════════════
+   Mapa expandido a pantalla completa
+   (activado por #map-expand-btn en app.js)
+   ═══════════════════════════════════════════════ */
+#map-wrapper.map-expanded {
+    position: fixed;
+    inset: 1rem;
+    z-index: 1000;
+    height: auto;
+    transition: none;
+}
+
+@media (min-width: 768px) {
+    #map-wrapper.map-expanded {
+        inset: 2rem;
+    }
+}

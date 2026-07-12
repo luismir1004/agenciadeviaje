@@ -85,9 +85,17 @@ class CacheManager {
     }
 
     /**
-     * Clear all cache
+     * Clear only this app's cache/session keys.
+     * Never wipes the whole origin storage (other features/apps
+     * on the same origin must not be affected).
      */
     clear() {
-        localStorage.clear();
+        const OWN_PREFIXES = ['weather_', 'session_'];
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+            const key = localStorage.key(i);
+            if (key && OWN_PREFIXES.some(p => key.startsWith(p))) {
+                localStorage.removeItem(key);
+            }
+        }
     }
 }

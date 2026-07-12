@@ -6,6 +6,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NextGen Europa Travel | Forecast</title>
 
+    <!-- Content Security Policy (allowlist de CDNs y APIs usadas) -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self';
+        script-src 'self' https://cdn.jsdelivr.net https://unpkg.com;
+        style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://unpkg.com;
+        font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net;
+        img-src 'self' data: blob: https://images.unsplash.com https://plus.unsplash.com https://*.basemaps.cartocdn.com https://unpkg.com;
+        connect-src 'self' https://www.7timer.info https://api.open-meteo.com;
+        media-src 'self' https://assets.mixkit.co;
+        worker-src 'self';
+        manifest-src 'self';
+        base-uri 'self';
+        form-action 'self';
+        object-src 'none'">
+
     <!-- Meta Tags SEO -->
     <meta name="description" content="Experimenta el clima de Europa con lujo. NextGen Europa Travel Agency.">
     <meta property="og:title" content="NextGen Europa | Pronóstico Exclusivo">
@@ -14,7 +28,8 @@
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="icons/icon-192x192.svg">
-    <link rel="apple-touch-icon" href="icons/icon-192x192.svg">
+    <link rel="icon" type="image/x-icon" href="favicon.ico" sizes="48x48">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 
     <!-- PWA Meta Tags -->
     <meta name="theme-color" content="#0A0F1E">
@@ -29,8 +44,9 @@
         href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500&family=Montserrat:wght@200;300;400;500;600;700&display=swap"
         rel="stylesheet">
 
-    <!-- Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Icons (Font Awesome — versión fijada + SRI) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css"
+        integrity="sha384-iw3OoTErCYJJB9mCa8LNS2hbsQ7M3C0EpIsO/H5+EGAkPGc6rk+V8i04oW/K5xq0" crossorigin="anonymous">
 
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -42,11 +58,19 @@
     <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
 
-    <!-- Chart.js CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Preload Critical Asset (imagen HQ del hero inicial: Madrid) -->
+    <link rel="preload" as="image"
+        href="https://images.unsplash.com/photo-1539037116277-4db20889f2d4?q=85&w=1920&auto=format&fit=crop">
 
-    <!-- GSAP CDN -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <!-- Chart.js CDN (versión fijada + SRI) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"
+        integrity="sha384-dug+JxfBvklEQdJ4AYuBBAIScUz0bVN73xpy273gcAwHjb3qI0fXmuYNaNfdyYJG"
+        crossorigin="anonymous"></script>
+
+    <!-- GSAP CDN (versión fijada + SRI) -->
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.2/dist/gsap.min.js"
+        integrity="sha384-d+vyQ0dYcymoP8ndq2hW7FGC50nqGdXUEgoOUGxbbkAJwZqL7h+jKN0GGgn9hFDS"
+        crossorigin="anonymous"></script>
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
@@ -69,10 +93,6 @@
         <div class="loader-brand" role="status" aria-label="Cargando aplicación">NextGen Europa</div>
         <div class="loader-brand-spinner"></div>
     </div>
-
-    <!-- Preload Critical Asset -->
-    <link rel="preload" as="image"
-        href="https://images.unsplash.com/photo-1543783207-ec64e4d95325?q=85&w=1920&auto=format&fit=crop">
 
     <!-- Audio Element -->
     <audio id="ambient-audio" loop class="hidden"></audio>
@@ -154,6 +174,10 @@
 
         <!-- Controls -->
         <div class="absolute top-6 right-6 z-50 flex gap-4">
+            <button id="locate-btn" class="glass-btn-icon group flex items-center justify-center gap-2"
+                aria-label="Usar mi ubicación actual">
+                <i class="fas fa-location-crosshairs text-white/50 group-hover:text-white transition-colors"></i>
+            </button>
             <button id="audio-toggle" class="glass-btn-icon group flex items-center justify-center gap-2"
                 aria-label="Activar o desactivar sonido ambiental">
                 <i class="fas fa-volume-mute text-white/50 group-hover:text-white transition-colors"></i>
@@ -186,7 +210,7 @@
                 <h2
                     class="font-serif text-3xl md:text-5xl text-white mb-2 tracking-tight flex items-center justify-center gap-4">
                     <span id="city-name-display" class="relative"></span>
-                    <span
+                    <span id="capital-badge"
                         class="px-3 py-1 bg-white/5 border border-white/10 rounded-full text-[10px] font-sans uppercase tracking-[0.2em] text-white/50 backdrop-blur-md align-middle translate-y-[-2px]">
                         Capital
                     </span>
@@ -224,7 +248,6 @@
                             </div>
                             <div class="skeleton-bone h-40 w-40 md:h-64 md:w-64 rounded-full mt-6 md:mt-0"></div>
                         </div>
-                        <div class="skeleton-bone h-32 w-32 rounded-full mt-6 md:mt-0"></div>
                     </div>
                 </div>
 
@@ -262,7 +285,7 @@
             </div>
 
             <!-- 7-Day List (Full Width on Desktop) -->
-            <div class="lg:col-span-3 glass-panel overflow-hidden flex flex-col h-full min-h-[400px]">
+            <div class="glass-panel overflow-hidden flex flex-col h-full min-h-[400px] mb-12">
                 <div
                     class="px-6 py-8 md:px-8 md:py-10 border-b border-white/5 sticky top-0 z-10 bg-white/[0.02] backdrop-blur-md">
                     <h3 class="font-serif text-2xl md:text-3xl text-white font-semibold text-lift mb-1 tracking-tight">
@@ -290,7 +313,6 @@
                     </div>
                 </div>
             </div>
-            </div>
 
             <!-- Itinerary CTA -->
             <div class="text-center mb-12 opacity-0" id="itinerary-cta">
@@ -303,7 +325,8 @@
             </div>
 
             <!-- Itinerary Modal -->
-            <div id="itinerary-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+            <div id="itinerary-modal" role="dialog" aria-modal="true" aria-labelledby="modal-city-name"
+                class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
                 <div class="absolute inset-0 bg-black/60 backdrop-blur-md" id="modal-backdrop"></div>
                 <div class="glass-panel w-full max-w-2xl max-h-[80vh] overflow-y-auto relative z-10 p-8 transform scale-95 opacity-0 transition-all duration-300"
                     id="modal-content">
@@ -362,36 +385,20 @@
         </footer>
     </main>
 
-    <!-- LocalForage CDN para IndexedDB -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
+    <!-- LocalForage CDN para IndexedDB (versión fijada + SRI) -->
+    <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"
+        integrity="sha384-MTDrIlFOzEqpmOxY6UIA/1Zkh0a64UlmJ6R0UrZXqXCPx99siPGi8EmtQjIeCcTH"
+        crossorigin="anonymous"></script>
 
-    <!-- Scripts -->
+    <!-- Scripts (Config.js primero: es la fuente de datos del resto) -->
+    <script src="services/Config.js" defer></script>
+    <script src="services/CacheManager.js" defer></script>
     <script src="services/HeroManager.js" defer></script>
     <script src="services/ExperienceManager.js" defer></script>
     <script src="services/ItineraryService.js" defer></script>
-    <script src="services/Config.js" defer></script>
-    <script src="services/CacheManager.js" defer></script>
     <script src="services/ChartManager.js" defer></script>
     <script src="services/UIManager.js" defer></script>
     <script src="app.js" defer></script>
-
-    <!-- PWA Service Worker Destroyer (For Local Dev/Cache Busting) -->
-    <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(function (registrations) {
-                for (let registration of registrations) {
-                    registration.unregister().then(boolean => {
-                        if (boolean) {
-                            console.log('[PWA] Killed residual Service Worker to force fresh UI.');
-                            if (!window.location.search.includes('sw=killed')) {
-                                window.location.search += (window.location.search ? '&' : '?') + 'sw=killed';
-                            }
-                        }
-                    });
-                }
-            });
-        }
-    </script>
 </body>
 
 </html>

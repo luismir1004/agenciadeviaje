@@ -1,5 +1,10 @@
 # Auditoría Técnica — NextGen Europa Weather SPA
 
+> **Estado de remediación (2026-07-12):** todos los hallazgos 🔴 críticos, 🟠 altos y 🟡 medios,
+> y los 🟢 bajos accionables, fueron **corregidos** en esta misma rama (ver commits posteriores
+> al informe). Quedan pendientes como mejoras futuras: suite de tests, pipeline de CI,
+> y assets de audio propios por ciudad — detalladas al final del informe original.
+
 **Fecha:** 2026-07-12 · **Alcance:** `frontend/weather-spa` completo, `vercel.json`, configuración del repositorio
 **Estado general:** Aplicación funcional y bien estructurada para un portfolio, pero con **una funcionalidad estrella (PWA/offline) totalmente inoperativa**, varias condiciones de carrera reales y desajustes importantes entre lo que documenta el README y lo que hace el código.
 

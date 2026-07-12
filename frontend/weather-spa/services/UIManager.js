@@ -23,15 +23,31 @@ class UIManager {
         if (type === 'error') icon = 'fa-circle-exclamation';
 
         const typeLabels = { info: 'Información', success: 'Éxito', error: 'Error', warning: 'Aviso' };
-        toast.innerHTML = `
-            <div class="flex items-center gap-4">
-                <i class="fas ${icon} text-lg icon-glow" style="color: var(--brand-accent)"></i>
-                <div class="flex flex-col">
-                    <span class="text-[9px] uppercase tracking-[0.4em] font-bold" style="color: var(--brand-dim); margin-bottom: 2px;">${typeLabels[type] || type}</span>
-                    <span class="text-sm font-light text-white/90 tracking-wide">${message}</span>
-                </div>
-            </div>
-        `;
+
+        // Construcción vía DOM: el mensaje se asigna con textContent para
+        // que nunca pueda interpretarse como HTML (anti-XSS por diseño).
+        const row = document.createElement('div');
+        row.className = 'flex items-center gap-4';
+
+        const iconEl = document.createElement('i');
+        iconEl.className = `fas ${icon} text-lg icon-glow`;
+        iconEl.style.color = 'var(--brand-accent)';
+
+        const col = document.createElement('div');
+        col.className = 'flex flex-col';
+
+        const label = document.createElement('span');
+        label.className = 'text-[9px] uppercase tracking-[0.4em] font-bold';
+        label.style.cssText = 'color: var(--brand-dim); margin-bottom: 2px;';
+        label.textContent = typeLabels[type] || type;
+
+        const msg = document.createElement('span');
+        msg.className = 'text-sm font-light text-white/90 tracking-wide';
+        msg.textContent = message;
+
+        col.append(label, msg);
+        row.append(iconEl, col);
+        toast.appendChild(row);
 
         this.#toastContainer.appendChild(toast);
 

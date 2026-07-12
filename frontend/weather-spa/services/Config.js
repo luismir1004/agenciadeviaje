@@ -137,6 +137,24 @@ const APP_CONFIG = {
             desc: 'Tormenta y Lluvia',
             color: 'text-purple-400',
             svg: `<svg viewBox="0 0 24 24" fill="none" class="w-full h-full text-current drop-shadow-lg" stroke="currentColor" stroke-width="1.5"><path fill="currentColor" fill-opacity="0.8" stroke="none" d="M15 15a4 4 0 01-8 0 5 5 0 019.5-2.2A3 3 0 0115 15z"/><path fill="currentColor" stroke="none" class="animate-pulse drop-shadow-[0_0_8px_currentColor]" d="M13 16l-3 5h3l-1 3 4-5h-3l1-3z"/></svg>`
+        },
+        'rainsnow': {
+            icon: 'fa-cloud-meatball',
+            desc: 'Aguanieve',
+            color: 'text-blue-200',
+            svg: `<svg viewBox="0 0 24 24" fill="none" class="w-full h-full text-current drop-shadow-lg" stroke="currentColor" stroke-width="1.5"><path fill="currentColor" fill-opacity="0.7" stroke="none" d="M15 15a4 4 0 01-8 0 5 5 0 019.5-2.2A3 3 0 0115 15z"/><path stroke-linecap="round" class="animate-[bounce_1s_infinite]" d="M9 17v3"/><g class="animate-[bounce_1.3s_infinite]"><circle cx="13" cy="19" r="1" fill="currentColor" stroke="none"/></g><path stroke-linecap="round" class="animate-[bounce_1.1s_infinite]" d="M16 17v2"/></svg>`
+        },
+        'foggy': {
+            icon: 'fa-smog',
+            desc: 'Niebla',
+            color: 'text-gray-300',
+            svg: `<svg viewBox="0 0 24 24" fill="none" class="w-full h-full text-current drop-shadow-md" stroke="currentColor" stroke-width="1.5"><g class="animate-pulse"><path stroke-linecap="round" opacity="0.9" d="M3 9h18"/><path stroke-linecap="round" opacity="0.6" d="M5 13h14"/><path stroke-linecap="round" opacity="0.4" d="M4 17h16"/><path stroke-linecap="round" opacity="0.25" d="M7 21h10"/></g></svg>`
+        },
+        'windy': {
+            icon: 'fa-wind',
+            desc: 'Ventoso',
+            color: 'text-teal-300',
+            svg: `<svg viewBox="0 0 24 24" fill="none" class="w-full h-full text-current drop-shadow-md" stroke="currentColor" stroke-width="1.5"><g class="animate-pulse"><path stroke-linecap="round" d="M3 8h9a3 3 0 103-3"/><path stroke-linecap="round" d="M3 12h13a3 3 0 113 3"/><path stroke-linecap="round" d="M3 16h7a2.5 2.5 0 112.5 2.5"/></g></svg>`
         }
     },
 
@@ -198,7 +216,10 @@ const APP_CONFIG = {
         lightsnow: { accent: '#7C93C3', hover: '#6B82B2', dim: 'rgba(124,147,195,0.10)', glow: 'rgba(124,147,195,0.15)', chart: '#7C93C3' },   // Ice Blue
         snow: { accent: '#7C93C3', hover: '#6B82B2', dim: 'rgba(124,147,195,0.10)', glow: 'rgba(124,147,195,0.15)', chart: '#7C93C3' },   // Ice Blue
         ts: { accent: '#7C3AED', hover: '#6D28D9', dim: 'rgba(124,58,237,0.10)', glow: 'rgba(124,58,237,0.15)', chart: '#7C3AED' },   // Violet Storm
-        tsrain: { accent: '#7C3AED', hover: '#6D28D9', dim: 'rgba(124,58,237,0.10)', glow: 'rgba(124,58,237,0.15)', chart: '#7C3AED' }
+        tsrain: { accent: '#7C3AED', hover: '#6D28D9', dim: 'rgba(124,58,237,0.10)', glow: 'rgba(124,58,237,0.15)', chart: '#7C3AED' },
+        rainsnow: { accent: '#7C93C3', hover: '#6B82B2', dim: 'rgba(124,147,195,0.10)', glow: 'rgba(124,147,195,0.15)', chart: '#7C93C3' },  // Ice Blue
+        foggy: { accent: '#64748B', hover: '#475569', dim: 'rgba(100,116,139,0.10)', glow: 'rgba(100,116,139,0.15)', chart: '#64748B' },  // Slate
+        windy: { accent: '#0D9488', hover: '#0F766E', dim: 'rgba(13,148,136,0.10)', glow: 'rgba(13,148,136,0.15)', chart: '#0D9488' }   // Teal
     },
 
     API: Object.freeze({
@@ -209,10 +230,15 @@ const APP_CONFIG = {
     })
 };
 
-// Deep-freeze the entire config to prevent runtime mutation
-Object.freeze(APP_CONFIG);
-Object.freeze(APP_CONFIG.CITIES);
-APP_CONFIG.CITIES.forEach(city => Object.freeze(city));
-Object.freeze(APP_CONFIG.WEATHER_MAP);
-Object.freeze(APP_CONFIG.EXPERIENCE_DATA);
-Object.freeze(APP_CONFIG.WEATHER_THEMES);
+// Deep-freeze REAL (recursivo): congela cada objeto/array anidado para
+// impedir cualquier mutación en runtime (temas, deals, SVGs, actividades...).
+function deepFreeze(obj) {
+    Object.getOwnPropertyNames(obj).forEach(prop => {
+        const value = obj[prop];
+        if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+            deepFreeze(value);
+        }
+    });
+    return Object.freeze(obj);
+}
+deepFreeze(APP_CONFIG);
