@@ -23,7 +23,7 @@
  * ╚═══════════════════════════════════════════════════════════════╝
  */
 
-const CACHE_VERSION = 'nextgen-v9';
+const CACHE_VERSION = 'nextgen-v10';
 const OFFLINE_PAGE = './offline.html';
 
 // ─────────────────────────────────────────────────────────────────
@@ -42,7 +42,6 @@ const APP_SHELL = [
     './app.js',
     './manifest.json',
     './favicon.ico',
-    './data/deals.json',
     './icons/icon-192x192.svg',
     './icons/icon-512x512.svg',
     './icons/icon-192x192.png',
@@ -335,20 +334,17 @@ self.addEventListener('message', async (event) => {
     if (event.data && event.data.type === 'SKIP_WAITING') {
         self.skipWaiting();
     }
-    if (event.data && event.data.type === 'GET_VERSION') {
-        event.ports[0].postMessage({ version: CACHE_VERSION });
-    }
     if (event.data && event.data.type === 'PREFETCH_ITINERARY') {
+        // La página envía las URLs (derivadas de CITY_DEALS en Config.js);
+        // el SW solo acepta imágenes de Unsplash — nada de listas duplicadas.
+        const urls = (event.data.urls || [])
+            .filter(u => typeof u === 'string' && u.startsWith('https://images.unsplash.com/'));
+        if (urls.length === 0) return;
+
         console.log('[SW] Pre-fetching itinerary images from Unsplash...');
         try {
             const cache = await caches.open(CACHE_VERSION);
-            // Example images from Config.js deals
-            const urlsToPrefetch = [
-                "https://images.unsplash.com/photo-1539037116277-4db20889f2d4?auto=format&fit=crop&w=800&q=80",
-                "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?auto=format&fit=crop&w=800&q=80",
-                "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=800&q=80"
-            ];
-            await cache.addAll(urlsToPrefetch);
+            await cache.addAll(urls);
             console.log('[SW] Itinerary pre-fetched successfully.');
         } catch (err) {
             console.warn('[SW] Failed to prefetch itinerary:', err);

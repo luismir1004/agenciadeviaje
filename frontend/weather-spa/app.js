@@ -30,7 +30,6 @@ class WeatherApp {
     #mapReady = false;
     #pendingChartData = null;
     #audioCtx = null;
-    #dynamicDeals = null;
     #searchAbort = null;
 
     constructor() {
@@ -67,7 +66,6 @@ class WeatherApp {
     async init() {
         this.#populateCities();
         this.#setupLazyInit();
-        await this.#loadDeals();
 
         // Events
         this.btnGenerate = document.getElementById('btn-generate-itinerary');
@@ -130,7 +128,10 @@ class WeatherApp {
         // Add Service Worker prefetch on offer button hover
         this.offerContainer.addEventListener('mouseenter', (e) => {
             if (e.target.closest('.btn-luxury') && navigator.serviceWorker.controller) {
-                navigator.serviceWorker.controller.postMessage({ type: 'PREFETCH_ITINERARY' });
+                navigator.serviceWorker.controller.postMessage({
+                    type: 'PREFETCH_ITINERARY',
+                    urls: APP_CONFIG.CITY_DEALS.map(d => d.image)
+                });
             }
         }, true);
 
@@ -275,7 +276,7 @@ class WeatherApp {
                         if (triggerText) triggerText.textContent = 'Tu Ubicación';
                         document.querySelectorAll('.dropdown-item').forEach(el => el.classList.remove('selected'));
 
-                        const ok = await this.loadCityWeather(localCity, false, true, false, signal);
+                        const ok = await this.loadCityWeather(localCity, true, false, signal);
                         if (ok && !signal.aborted) this.#ui.showToast('Ubicación actualizada.', 'success');
                         resolve('Success');
                     } catch (e) {
@@ -481,23 +482,38 @@ class WeatherApp {
         });
     }
 
+    /**
+     * Plantilla compartida de item del dropdown — la lista estática y los
+     * resultados del buscador solo difieren en datos, badge e icono.
+     */
+    #cityItemHTML({ id, dataAttrs, name, subtitle, badge = '', icon }) {
+        return `
+            <div class="dropdown-item p-4 flex items-center justify-between cursor-pointer border-b border-hairline last:border-none group focus:outline-none"
+                 role="option" id="${id}" tabindex="-1" aria-selected="false" ${dataAttrs}>
+                <div class="flex items-center gap-3">
+                    <div class="flex flex-col">
+                        <span class="city-name font-serif text-lg text-ink group-hover:text-accent transition-colors">${name}</span>
+                        <span class="text-[10px] text-ink-faint uppercase tracking-widest">${subtitle}</span>
+                    </div>
+                    ${badge}
+                </div>
+                <i class="fas ${icon} text-ink-faint opacity-0 group-hover:opacity-100 transition-all"></i>
+            </div>
+        `;
+    }
+
     /** Lista estática de destinos destacados (Config.CITIES). */
     #renderCityOptions() {
         const options = document.getElementById('city-options');
         if (!options) return;
-        options.innerHTML = APP_CONFIG.CITIES.map((city, index) => `
-            <div class="dropdown-item p-4 flex items-center justify-between cursor-pointer border-b border-hairline last:border-none group focus:outline-none"
-                 role="option" id="city-option-${index}" tabindex="-1" data-value="${index}" aria-selected="false">
-                <div class="flex items-center gap-3">
-                    <div class="flex flex-col">
-                        <span class="city-name font-serif text-lg text-ink group-hover:text-accent transition-colors">${city.name}</span>
-                        <span class="text-[10px] text-ink-faint uppercase tracking-widest">${city.country}</span>
-                    </div>
-                    ${city.isCapital ? `<span class="text-[9px] font-bold text-accent-strong px-1.5 py-0.5 bg-accent-dim border border-hairline rounded uppercase tracking-tighter ml-auto">Capital</span>` : ''}
-                </div>
-                <i class="fas fa-chevron-right text-ink-faint opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all"></i>
-            </div>
-        `).join('');
+        options.innerHTML = APP_CONFIG.CITIES.map((city, index) => this.#cityItemHTML({
+            id: `city-option-${index}`,
+            dataAttrs: `data-value="${index}"`,
+            name: city.name,
+            subtitle: city.country,
+            badge: city.isCapital ? `<span class="text-[9px] font-bold text-accent-strong px-1.5 py-0.5 bg-accent-dim border border-hairline rounded uppercase tracking-tighter ml-auto">Capital</span>` : '',
+            icon: 'fa-chevron-right group-hover:translate-x-1'
+        })).join('');
     }
 
     /** Busca ciudades arbitrarias vía Open-Meteo Geocoding. */
@@ -523,19 +539,15 @@ class WeatherApp {
                 return;
             }
 
-            options.innerHTML = results.map((r, i) => `
-                <div class="dropdown-item p-4 flex items-center justify-between cursor-pointer border-b border-hairline last:border-none group focus:outline-none"
-                     role="option" id="city-result-${i}" tabindex="-1" aria-selected="false"
-                     data-lat="${Number(r.latitude)}" data-lon="${Number(r.longitude)}"
+            options.innerHTML = results.map((r, i) => this.#cityItemHTML({
+                id: `city-result-${i}`,
+                dataAttrs: `data-lat="${Number(r.latitude)}" data-lon="${Number(r.longitude)}"
                      data-name="${sanitize(r.name)}" data-country="${sanitize(r.country || '')}"
-                     data-tz="${sanitize(r.timezone || 'UTC')}">
-                    <div class="flex flex-col">
-                        <span class="city-name font-serif text-lg text-ink group-hover:text-accent transition-colors">${sanitize(r.name)}</span>
-                        <span class="text-[10px] text-ink-faint uppercase tracking-widest">${sanitize([r.admin1, r.country].filter(Boolean).join(' · '))}</span>
-                    </div>
-                    <i class="fas fa-location-arrow text-ink-faint opacity-0 group-hover:opacity-100 transition-all"></i>
-                </div>
-            `).join('');
+                     data-tz="${sanitize(r.timezone || 'UTC')}"`,
+                name: sanitize(r.name),
+                subtitle: sanitize([r.admin1, r.country].filter(Boolean).join(' · ')),
+                icon: 'fa-location-arrow'
+            })).join('');
         } catch (err) {
             if (err.name === 'AbortError') return;
             options.innerHTML = `<div class="search-hint">No se pudo buscar. Comprueba tu conexión.</div>`;
@@ -560,7 +572,7 @@ class WeatherApp {
         this.#hero.updateCity(city.name);
         this.updateExperience(city.name);
 
-        await this.loadCityWeather(city, false, true, true, signal);
+        await this.loadCityWeather(city, true, true, signal);
     }
 
     #initAccessibility() {
@@ -728,7 +740,7 @@ class WeatherApp {
 
         // Load Weather (pass signal for cancellation)
         const signal = this.#abortController.signal;
-        const ok = await this.loadCityWeather(city, true, true, showToast, signal);
+        const ok = await this.loadCityWeather(city, true, showToast, signal);
 
         // B3: solo pintar la oferta si ESTA carga terminó bien y sigue vigente.
         // Un flujo abortado (o fallido) no debe resucitar la oferta de su ciudad.
@@ -744,7 +756,6 @@ class WeatherApp {
             || this.#experience.getExperience('Tu Ubicación');
         if (data) {
             this.#hero.setBackground(data.img, data.blur);
-            this.#experience.updateAudio(cityName);
         }
     }
 
@@ -766,7 +777,7 @@ class WeatherApp {
     }
 
 
-    async loadCityWeather(city, _showOffer = true, showLoader = true, showToast = true, signal = null) {
+    async loadCityWeather(city, showLoader = true, showToast = true, signal = null) {
         if (showLoader) this.setLoading(true);
 
         const titleSpan = document.getElementById('city-name-display');
@@ -790,7 +801,7 @@ class WeatherApp {
                 if (showToast) this.#ui.showToast(`Datos de ${city.name} recuperados.`, 'info');
             } else {
                 try {
-                    data = await this.#fetchWithRetry(city.coords, 1, signal);
+                    data = await this.#fetchWithRetry(city.coords, signal);
                     this.#cache.set(cacheKey, data);
 
                     // Guardar en persistencia (IndexedDB via localforage) para offline real
@@ -877,7 +888,7 @@ class WeatherApp {
      * probabilidad de precipitación y viento reales) y 7Timer como
      * fallback con reintentos exponenciales.
      */
-    async #fetchWithRetry(coords, _attempt = 1, signal = null) {
+    async #fetchWithRetry(coords, signal = null) {
         try {
             return await this.#fetchOpenMeteo(coords, signal);
         } catch (error) {
@@ -975,7 +986,6 @@ class WeatherApp {
 
         if (!response.ok) {
             const error = new Error(`API Error: HTTP ${response.status}`);
-            error.status = response.status;
 
             // B5: el Service Worker responde 503 con X-SW-Offline cuando no
             // hay red. Reintentar contra esa respuesta sintética (o estando
@@ -1164,7 +1174,6 @@ class WeatherApp {
         // Variante AA para texto pequeño: oscurecida en claro, aclarada en oscuro
         root.setProperty('--brand-accent-text',
             dark ? (theme.textDark || theme.accent) : (theme.text || theme.accent));
-        root.setProperty('--brand-accent-hover', theme.hover);
         root.setProperty('--brand-dim', theme.dim);
         root.setProperty('--brand-glow', theme.glow);
     }
@@ -1274,27 +1283,10 @@ class WeatherApp {
             this.ctaContainer.classList.add('hidden');
             this.errorState.classList.add('hidden');
 
-            // Inject Skeleton Screens into bento main
-            this.bentoMain.innerHTML = `
-                <div class="skeleton-layer absolute inset-0 z-20 flex flex-col md:flex-row items-center justify-between p-12 w-full h-full">
-                    <div class="space-y-4 w-full md:w-1/2">
-                        <div class="skeleton-bone h-6 w-32 rounded-full"></div>
-                        <div class="skeleton-bone h-24 md:h-32 w-48 rounded-lg mt-4"></div>
-                        <div class="skeleton-bone h-6 w-3/4 md:w-1/2 rounded mt-6"></div>
-                        <div class="flex gap-10 mt-6">
-                            <div>
-                                <div class="skeleton-bone h-3 w-12 rounded mb-2"></div>
-                                <div class="skeleton-bone h-8 w-16 rounded"></div>
-                            </div>
-                            <div>
-                                <div class="skeleton-bone h-3 w-16 rounded mb-2"></div>
-                                <div class="skeleton-bone h-8 w-16 rounded"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="skeleton-bone h-40 w-40 md:h-64 md:w-64 rounded-full mt-6 md:mt-0"></div>
-                </div>
-                `;
+            // Skeleton del panel principal: fuente única en el <template>
+            // de index.html — clonarlo evita mantener el markup por duplicado
+            const skeletonTpl = document.getElementById('bento-main-skeleton');
+            this.bentoMain.replaceChildren(skeletonTpl.content.cloneNode(true));
 
             // Inject Skeleton into bento list
             this.bentoList.innerHTML = Array.from({ length: 5 }, (_, i) => `
@@ -1378,25 +1370,13 @@ class WeatherApp {
     }
 
 
-    async #loadDeals() {
-        try {
-            const res = await fetch('data/deals.json');
-            if (res.ok) {
-                this.#dynamicDeals = await res.json();
-            } else throw new Error();
-        } catch {
-            this.#dynamicDeals = APP_CONFIG.CITY_DEALS;
-        }
-    }
-
     updateOffer(cityIndex) {
-        const deal = (this.#dynamicDeals || APP_CONFIG.CITY_DEALS)[cityIndex];
+        const deal = APP_CONFIG.CITY_DEALS[cityIndex];
         if (!deal) {
             this.offerContainer.classList.add('hidden');
             return;
         }
 
-        // Sanitizar: deals.json llega por fetch y podría ser manipulado
         const safeTitle = sanitize(deal.title);
         const safePrice = sanitize(deal.price);
         const safeImage = safeUrl(deal.image, '');

@@ -23,8 +23,6 @@ export default {
                     dim: 'var(--brand-dim)',
                     strong: 'var(--brand-accent-text)',
                 },
-                // Alias heredado del diseño anterior; ahora apunta a paper
-                midnight: 'rgb(var(--paper-rgb) / <alpha-value>)',
             }
         }
     },

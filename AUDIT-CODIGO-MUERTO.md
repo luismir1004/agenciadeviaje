@@ -64,3 +64,18 @@
 4. **Decisiones de producto**: C1/C4 (fuente única de deals/experiencias), F8+C5 (terminar o retirar el audio ambiental), M8 (mantener o no `clear()`), M10 (podar `vendor/leaflet/images`).
 
 Estimación total: ~150 líneas eliminables y 4 refactors de <30 min cada uno. Ninguno cambia comportamiento observable — la suite e2e existente es la red de seguridad para verificarlo.
+
+---
+
+## ✅ Limpieza aplicada (2026-07-13)
+
+Todos los niveles (1-4) quedaron aplicados en este mismo branch. Decisiones de producto tomadas:
+
+- **C1/C4 — fuente única de deals**: `data/deals.json` eliminado (junto con `#loadDeals` y su fetch); las ofertas viven solo en `APP_CONFIG.CITY_DEALS` y sus **imágenes se derivan del `id` de la experiencia de cada ciudad** antes del `deepFreeze` — un solo lugar para cada foto. Las URLs resultantes son byte-idénticas a las que estaban duplicadas a mano.
+- **F8/C5 — audio ambiental retirado**: era un no-op para 5 de 8 ciudades y las otras 3 compartían el mismo MP3. Fuera `<audio>`, botón/ecualizador, `toggleAudio`/`updateAudio`, los campos `audio:` de Config y la directiva CSP `media-src`. El **click háptico se conserva** (Web Audio propio, sin assets).
+- **M8 — `CacheManager.clear()` se mantiene**: API correcta y testeada; coste de mantenerla ~0.
+- **M10**: podados `marker-icon-2x.png` y `marker-shadow.png` (sin referencias); `layers*.png` y `marker-icon.png` se conservan porque `leaflet.css` los referencia.
+
+Refactors: C2 → el skeleton de `bento-main` vive en un único `<template id="bento-main-skeleton">` que `setLoading` clona; C3 → la página envía las URLs a precachear en el mensaje `PREFETCH_ITINERARY` (el SW filtra a Unsplash); C6 → helper compartido `#cityItemHTML` para la lista estática y el buscador; C8 → los 3 `Intl.DateTimeFormat` se construyen una vez por parseo, no por punto.
+
+También aplicado: M1-M7, M9, F3-F7 y bump del SW a `nextgen-v10` (el shell precacheado cambió). **Verificación:** ESLint limpio, 26/26 tests unitarios y 16/16 e2e en verde tras la limpieza.

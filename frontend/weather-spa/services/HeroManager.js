@@ -70,7 +70,7 @@ export class HeroManager {
 
         // Bucle infinito — omitido con prefers-reduced-motion (un timeScale
         // global alto lo convertiría en parpadeo, así que se salta entero)
-        if (typeof REDUCED_MOTION === 'undefined' || !REDUCED_MOTION) {
+        if (!REDUCED_MOTION) {
             gsap.to(this.#scrollIndicator, { y: 10, duration: 2.5, repeat: -1, yoyo: true, ease: "sine.inOut" });
         }
     }

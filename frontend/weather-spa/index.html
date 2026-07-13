@@ -13,7 +13,6 @@
         font-src 'self';
         img-src 'self' data: blob: https://images.unsplash.com https://plus.unsplash.com https://*.basemaps.cartocdn.com;
         connect-src 'self' https://www.7timer.info https://api.open-meteo.com https://geocoding-api.open-meteo.com;
-        media-src 'self' https://assets.mixkit.co;
         worker-src 'self';
         manifest-src 'self';
         base-uri 'self';
@@ -88,9 +87,6 @@
         <div class="loader-brand-spinner"></div>
     </div>
 
-    <!-- Audio Element -->
-    <audio id="ambient-audio" loop class="hidden"></audio>
-
     <!-- ═══════════════════════════════════════════════════════════════
          CABECERA / NAV
          ═══════════════════════════════════════════════════════════════ -->
@@ -103,19 +99,6 @@
             <button id="locate-btn" class="glass-btn-icon group flex items-center justify-center gap-2"
                 aria-label="Usar mi ubicación actual">
                 <i class="fas fa-location-crosshairs transition-colors"></i>
-            </button>
-            <button id="audio-toggle" class="glass-btn-icon group flex items-center justify-center gap-2"
-                aria-label="Activar o desactivar sonido ambiental">
-                <i class="fas fa-volume-mute transition-colors"></i>
-                <div id="audio-equalizer"
-                    class="flex items-end gap-[3px] h-3.5 hidden opacity-0 transition-opacity duration-300">
-                    <div class="w-[3px] bg-accent rounded-t-sm h-full"
-                        style="animation: eq 0.8s ease-in-out infinite alternate;"></div>
-                    <div class="w-[3px] bg-accent rounded-t-sm h-2/3"
-                        style="animation: eq 1.1s ease-in-out infinite alternate-reverse;"></div>
-                    <div class="w-[3px] bg-accent rounded-t-sm h-full"
-                        style="animation: eq 0.9s ease-in-out infinite alternate;"></div>
-                </div>
             </button>
         </div>
     </header>
@@ -215,8 +198,7 @@
         <section class="flex-grow flex flex-col">
 
             <!-- Encabezado de sección: regla suiza + índice -->
-            <div class="section-rule mb-10 flex flex-col md:flex-row md:items-end md:justify-between gap-4"
-                id="forecast-title-container">
+            <div class="section-rule mb-10 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
                 <div>
                     <p class="eyebrow mb-3"><span class="section-index">01</span> — Ahora mismo</p>
                     <h2 class="font-serif text-4xl md:text-6xl text-ink tracking-tight flex items-center gap-4 flex-wrap">
@@ -241,7 +223,11 @@
                 <div class="lg:col-span-2 flex flex-col gap-6">
                     <div id="bento-main"
                         class="glass-panel p-8 md:p-12 relative overflow-hidden min-h-[350px] flex flex-col md:flex-row items-center justify-between group">
-                        <!-- Skeleton Loader -->
+                        <!-- Skeleton: lo clona app.js desde #bento-main-skeleton
+                             (fuente única; el preloader cubre el primer paint) -->
+                    </div>
+
+                    <template id="bento-main-skeleton">
                         <div
                             class="skeleton-layer absolute inset-0 z-20 flex flex-col md:flex-row items-center justify-between p-12 w-full h-full">
                             <div class="space-y-4 w-full md:w-1/2">
@@ -261,7 +247,7 @@
                             </div>
                             <div class="skeleton-bone h-40 w-40 md:h-64 md:w-64 rounded-full mt-6 md:mt-0"></div>
                         </div>
-                    </div>
+                    </template>
                 </div>
 
                 <!-- Mapa + Chart -->
