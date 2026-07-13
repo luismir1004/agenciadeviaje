@@ -3,7 +3,7 @@
  * Handles LocalStorage persistence with TTL (Time To Live) for weather data,
  * and session persistence (no TTL) for UI state like last selected city.
  */
-class CacheManager {
+export class CacheManager {
     #ttl;
 
     /**
@@ -79,7 +79,7 @@ class CacheManager {
         try {
             const raw = localStorage.getItem(`session_${key}`);
             return raw !== null ? JSON.parse(raw) : null;
-        } catch (e) {
+        } catch {
             return null;
         }
     }

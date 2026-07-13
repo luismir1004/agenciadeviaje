@@ -581,6 +581,29 @@ h3,
 .toast-warning { border-left-color: #D97706; }
 .toast-warning i { color: #D97706; }
 
+/* Botón de acción dentro de un toast (p.ej. "Recargar" en updates del SW) */
+.toast-action {
+    margin-left: auto;
+    background: var(--ink);
+    color: var(--paper);
+    border: none;
+    border-radius: 999px;
+    padding: 0.45rem 1rem;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.25s ease;
+}
+
+.toast-action:hover {
+    background: var(--brand-accent);
+    color: #fff;
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    CHART
    ═══════════════════════════════════════════════════════════════════ */

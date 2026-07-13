@@ -7,9 +7,9 @@
  * hover de filas tras animación (B7), coherencia de geolocalización (B8),
  * cambio de ciudad con AbortController y modal accesible.
  */
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const { launchApp, snapshot, selectCity, baseTempForLat } = require('./helpers');
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { launchApp, snapshot, selectCity, baseTempForLat } from './helpers.js';
 
 // Latitudes de Config.js: base determinista del stub por ciudad
 const MADRID = baseTempForLat(40.4168);   // 10

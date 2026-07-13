@@ -6,11 +6,11 @@
 
 // Preferencia de movimiento reducido — consultada por app.js, HeroManager
 // y ChartManager para saltar/acelerar animaciones (WCAG 2.3.3).
-const REDUCED_MOTION = typeof window !== 'undefined'
+export const REDUCED_MOTION = typeof window !== 'undefined'
     && typeof window.matchMedia === 'function'
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const APP_CONFIG = {
+export const APP_CONFIG = {
     CITIES: [
         { name: 'Madrid', country: 'España', isCapital: true, coords: { lat: 40.4168, lon: -3.7038 }, timezone: 'Europe/Madrid' },
         { name: 'Londres', country: 'Reino Unido', isCapital: true, coords: { lat: 51.5074, lon: -0.1278 }, timezone: 'Europe/London' },

@@ -10,11 +10,10 @@
  * ║  ├──────────────────────────┼──────────────────────────────┤ ║
  * ║  │ Navegaciones (HTML)      │ Network First → Cache        │ ║
  * ║  ├──────────────────────────┼──────────────────────────────┤ ║
- * ║  │ App Shell (CSS, JS       │ Stale-While-Revalidate       │ ║
- * ║  │ local, Icons)            │ (deploys llegan solos)       │ ║
+ * ║  │ App Shell (CSS, JS,      │ Stale-While-Revalidate       │ ║
+ * ║  │ vendor, fonts, icons)    │ (deploys llegan solos)       │ ║
  * ║  ├──────────────────────────┼──────────────────────────────┤ ║
- * ║  │ CDN (Fonts, FA, GSAP,    │ Stale-While-Revalidate       │ ║
- * ║  │ Chart.js, Leaflet)       │ (serve cache + bg update)    │ ║
+ * ║  │ Tiles CARTO              │ Stale-While-Revalidate       │ ║
  * ║  ├──────────────────────────┼──────────────────────────────┤ ║
  * ║  │ API 7Timer               │ Network First →              │ ║
  * ║  │                          │ Cache → Offline JSON         │ ║
@@ -24,7 +23,7 @@
  * ╚═══════════════════════════════════════════════════════════════╝
  */
 
-const CACHE_VERSION = 'nextgen-v7';
+const CACHE_VERSION = 'nextgen-v8';
 const OFFLINE_PAGE = './offline.html';
 
 // ─────────────────────────────────────────────────────────────────
@@ -56,7 +55,18 @@ const APP_SHELL = [
     './services/UIManager.js',
     './services/HeroManager.js',
     './services/ExperienceManager.js',
-    './services/ItineraryService.js'
+    './services/ItineraryService.js',
+    './services/sanitize.js',
+    './services/forecastParser.js',
+    './vendor/chart.umd.js',
+    './vendor/gsap.min.js',
+    './vendor/localforage.min.js',
+    './vendor/leaflet/leaflet.js',
+    './vendor/leaflet/leaflet.css',
+    './vendor/fontawesome/css/all.min.css',
+    './vendor/fontawesome/webfonts/fa-solid-900.woff2',
+    './vendor/fontawesome/webfonts/fa-brands-400.woff2',
+    './vendor/fontawesome/webfonts/fa-regular-400.woff2'
 ];
 
 // ─────────────────────────────────────────────────────────────────
@@ -64,9 +74,7 @@ const APP_SHELL = [
 // Sirve caché instantáneamente, actualiza en background
 // ─────────────────────────────────────────────────────────────────
 const CDN_PATTERNS = [
-    'cdn.jsdelivr.net',       // Chart.js, GSAP, Font Awesome, localforage
-    'unpkg.com/leaflet',
-    'basemaps.cartocdn.com'   // Leaflet map tiles
+    'basemaps.cartocdn.com'   // Leaflet map tiles (único tercero cacheable)
 ];
 
 // ─────────────────────────────────────────────────────────────────
@@ -90,7 +98,9 @@ const IMAGE_PATTERNS = [
 // ─────────────────────────────────────────────────────────────────
 self.addEventListener('install', (event) => {
     console.log(`[SW] Install — ${CACHE_VERSION}`);
-    self.skipWaiting();
+    // Sin skipWaiting() automático: la versión nueva queda en 'waiting'
+    // y la página muestra un toast "Nueva versión disponible"; al aceptar,
+    // envía SKIP_WAITING (handler en 'message') y recarga.
 
     event.waitUntil(
         caches.open(CACHE_VERSION)
@@ -195,7 +205,7 @@ async function cacheFirst(request) {
             cache.put(request, response.clone());
         }
         return response;
-    } catch (err) {
+    } catch {
         return offlineFallback(request);
     }
 }
@@ -251,7 +261,7 @@ async function networkFirst(request) {
             cache.put(request, response.clone());
         }
         return response;
-    } catch (err) {
+    } catch {
         // Red falló → buscar en caché
         const cached = await cache.match(request);
         if (cached) {

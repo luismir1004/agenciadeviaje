@@ -1,44 +1,15 @@
 // ═══════════════════════════════════════════════════════════════
-// SANITIZACIÓN XSS — Filtro ligero para datos de la API
+// NextGen Europa — WeatherApp (ES Modules)
 // ═══════════════════════════════════════════════════════════════
-/**
- * sanitize(value)
- * Escapa caracteres HTML peligrosos usando el DOM como parser seguro.
- * Protege contra XSS si la API 7Timer fuera comprometida.
- *
- * Transforma caracteres de riesgo:
- *  & → &amp;  |  < → &lt;  |  > → &gt;
- *  " → &quot; |  ' → &#x27; |  ` → &#x60;
- *
- * @param {any} value - Valor a sanitizar
- * @param {string} [type='text'] - 'text' | 'number' | 'icon'
- * @returns {string} Valor seguro para insertar en el DOM
- */
-function sanitize(value, type = 'text') {
-    // Rechazar null/undefined/NaN → valor neutro
-    if (value === null || value === undefined) return '';
-
-    // Números: validar rango y devolver string segura
-    if (type === 'number') {
-        const num = parseFloat(value);
-        if (isNaN(num) || num < -100 || num > 100) return '—';
-        return String(Math.round(num));
-    }
-
-    // Iconos FontAwesome (ej: 'fa-sun'): solo alfanuméricos y guiones
-    if (type === 'icon') {
-        return String(value).replace(/[^a-zA-Z0-9-]/g, '');
-    }
-
-    // Texto genérico: escapar entidades HTML peligrosas
-    // Usamos el truco DOM: textContent escapa automáticamente
-    const div = document.createElement('div');
-    div.textContent = String(value);
-    return div.innerHTML
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#x27;')
-        .replace(/`/g, '&#x60;');
-}
+import { APP_CONFIG, REDUCED_MOTION } from './services/Config.js';
+import { sanitize, safeUrl } from './services/sanitize.js';
+import { processForecastData, validateForecastData } from './services/forecastParser.js';
+import { CacheManager } from './services/CacheManager.js';
+import { UIManager } from './services/UIManager.js';
+import { HeroManager } from './services/HeroManager.js';
+import { ExperienceManager } from './services/ExperienceManager.js';
+import { ItineraryService } from './services/ItineraryService.js';
+import { ChartManager } from './services/ChartManager.js';
 
 class WeatherApp {
     #cache;
@@ -66,7 +37,7 @@ class WeatherApp {
         // ser efectivamente instantáneos SIN perder los onComplete de los
         // que depende la lógica (preloader, modal). Los bucles infinitos
         // se omiten individualmente en su punto de creación.
-        if (typeof REDUCED_MOTION !== 'undefined' && REDUCED_MOTION) {
+        if (REDUCED_MOTION) {
             gsap.globalTimeline.timeScale(1000);
         }
 
@@ -131,6 +102,18 @@ class WeatherApp {
             document.body.classList.remove('print-itinerary');
         });
 
+        // Notificación de actualización del SW (evento del registro, abajo)
+        window.addEventListener('sw-update-available', (e) => {
+            const worker = e.detail?.worker;
+            if (!worker) return;
+            this.#ui.showToast('Nueva versión disponible.', 'info', {
+                action: {
+                    label: 'Recargar',
+                    handler: () => worker.postMessage({ type: 'SKIP_WAITING' })
+                }
+            });
+        });
+
         // Listen for online/offline events
         window.addEventListener('online', () => {
             this.#ui.showToast('Conexión restablecida.', 'success');
@@ -160,7 +143,7 @@ class WeatherApp {
         });
 
         // Mesh gradient parallax on mouse (omitido con movimiento reducido)
-        if (typeof REDUCED_MOTION === 'undefined' || !REDUCED_MOTION) {
+        if (!REDUCED_MOTION) {
             this.#initMeshParallax();
         }
 
@@ -631,7 +614,7 @@ class WeatherApp {
     }
 
 
-    async loadCityWeather(city, showOffer = true, showLoader = true, showToast = true, signal = null) {
+    async loadCityWeather(city, _showOffer = true, showLoader = true, showToast = true, signal = null) {
         if (showLoader) this.setLoading(true);
 
         const titleSpan = document.getElementById('city-name-display');
@@ -679,10 +662,10 @@ class WeatherApp {
             // Guard: if this request was aborted, stop rendering stale data
             if (signal && signal.aborted) return false;
 
-            const dailyForecasts = this.#processForecastData(data, city);
+            const dailyForecasts = processForecastData(data, city);
             this.#currentForecast = dailyForecasts;
 
-            const validatedForecasts = this.#validateForecastData(dailyForecasts);
+            const validatedForecasts = validateForecastData(dailyForecasts);
 
             // Apply dynamic theme FIRST: the chart and accent-tinted UI
             // read --brand-accent at render time, so the theme must be
@@ -829,119 +812,6 @@ class WeatherApp {
         }
 
         return await response.json();
-    }
-
-    #processForecastData(data, city) {
-        const series = data?.dataseries;
-
-        // Guard: API returned null/undefined dataseries
-        if (!Array.isArray(series) || series.length === 0) {
-            console.warn('API returned empty or invalid dataseries');
-            return [];
-        }
-
-        const tz = city.timezone || 'UTC';
-
-        // 7Timer's `timepoint` is an offset in hours from the model init
-        // time (`init` = "YYYYMMDDHH" in UTC), NOT from "now". Anchor the
-        // buckets to init when available; fall back to now (Open-Meteo path).
-        let base = new Date();
-        const initMatch = typeof data.init === 'string' && data.init.match(/^(\d{4})(\d{2})(\d{2})(\d{2})$/);
-        if (initMatch) {
-            base = new Date(Date.UTC(+initMatch[1], +initMatch[2] - 1, +initMatch[3], +initMatch[4]));
-        }
-
-        const getDateFromOffset = (offsetHours) => {
-            const date = new Date(base.getTime() + offsetHours * 60 * 60 * 1000);
-
-            const formatterDate = new Intl.DateTimeFormat('es-ES', {
-                timeZone: tz, day: 'numeric', month: 'short'
-            });
-            const formatterDay = new Intl.DateTimeFormat('es-ES', {
-                timeZone: tz, weekday: 'long'
-            });
-            const formatterKey = new Intl.DateTimeFormat('en-CA', {
-                timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit'
-            }); // en-CA gives YYYY-MM-DD
-
-            return {
-                key: formatterKey.format(date),
-                dayName: formatterDay.format(date),
-                fullDate: formatterDate.format(date)
-            };
-        };
-
-        // STEP 1: Group raw API points into daily buckets (pure aggregation)
-        const dailyData = {};
-        series.forEach(point => {
-            const { key, dayName, fullDate } = getDateFromOffset(point.timepoint);
-            if (!dailyData[key]) {
-                dailyData[key] = { dayName, date: fullDate, temps: [], weathers: [], precipPoints: 0, totalPoints: 0, rainProbs: [] };
-            }
-
-            // Filter invalid temperatures: -9999 sentinel, null, undefined
-            if (point.temp2m !== -9999 && point.temp2m !== null && point.temp2m !== undefined) {
-                dailyData[key].temps.push(point.temp2m);
-            }
-
-            // Filter null/undefined weather codes
-            if (point.weather) {
-                dailyData[key].weathers.push(point.weather);
-            }
-
-            // Precipitation signal: 7Timer exposes prec_type ('rain'|'snow'|'none'),
-            // the Open-Meteo fallback attaches a real rain_prob percentage.
-            dailyData[key].totalPoints++;
-            if (point.prec_type && point.prec_type !== 'none') dailyData[key].precipPoints++;
-            if (typeof point.rain_prob === 'number') dailyData[key].rainProbs.push(point.rain_prob);
-        });
-
-        // STEP 2: Normalize — apply fallbacks AFTER all chunks are processed
-        const days = Object.values(dailyData).slice(0, 7);
-        days.forEach(day => {
-            if (day.temps.length === 0) day.temps.push(18);
-            if (day.weathers.length === 0) day.weathers.push('clear');
-        });
-
-        // STEP 3: Reduce to daily summaries
-        return days.map(day => {
-            const maxTemp = Math.max(...day.temps);
-            const minTemp = Math.min(...day.temps);
-
-            // Determine dominant weather via frequency count
-            const weatherCounts = day.weathers.reduce((acc, curr) => {
-                acc[curr] = (acc[curr] || 0) + 1;
-                return acc;
-            }, {});
-            const dominantWeather = Object.keys(weatherCounts)
-                .reduce((a, b) => weatherCounts[a] > weatherCounts[b] ? a : b);
-
-            const safeWeather = dominantWeather.replace('day', '').replace('night', '');
-
-            // Rain chance: real probability from Open-Meteo if present;
-            // otherwise share of 3h-slots with precipitation (7Timer).
-            const rainChance = day.rainProbs.length > 0
-                ? Math.max(...day.rainProbs)
-                : (day.totalPoints > 0 ? Math.round((day.precipPoints / day.totalPoints) * 100) : 0);
-
-            return {
-                dayName: day.dayName,
-                date: day.date,
-                max: maxTemp,
-                min: minTemp,
-                weather: safeWeather,
-                rainChance,
-                ...(APP_CONFIG.WEATHER_MAP[safeWeather] || APP_CONFIG.WEATHER_MAP['clear'])
-            };
-        });
-    }
-
-    #validateForecastData(forecasts) {
-        return forecasts.map(day => {
-            if (isNaN(day.max) || day.max === null) day.max = 20;
-            if (isNaN(day.min) || day.min === null) day.min = 15;
-            return day;
-        });
     }
 
     #renderForecast(forecasts) {
@@ -1138,7 +1008,7 @@ class WeatherApp {
             // Quick fade-out for a crisp click feel
             gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.02);
             osc.stop(ctx.currentTime + 0.03);
-        } catch (e) {
+        } catch {
             // Web Audio not supported — fail silently
         }
     }
@@ -1329,20 +1199,9 @@ class WeatherApp {
             if (res.ok) {
                 this.#dynamicDeals = await res.json();
             } else throw new Error();
-        } catch (e) {
+        } catch {
             this.#dynamicDeals = APP_CONFIG.CITY_DEALS;
         }
-    }
-
-    /**
-     * Valida que una URL sea segura para inyectar en href/src:
-     * solo anchors (#), rutas relativas/absolutas del sitio, o https.
-     */
-    #safeUrl(url, fallback = '#') {
-        const str = String(url || '');
-        if (/^(#|\/(?!\/)|\.\/)/.test(str)) return str.replace(/"/g, '%22');
-        if (/^https:\/\//i.test(str)) return str.replace(/"/g, '%22');
-        return fallback;
     }
 
     updateOffer(cityIndex) {
@@ -1355,8 +1214,8 @@ class WeatherApp {
         // Sanitizar: deals.json llega por fetch y podría ser manipulado
         const safeTitle = sanitize(deal.title);
         const safePrice = sanitize(deal.price);
-        const safeImage = this.#safeUrl(deal.image, '');
-        const safeLink = this.#safeUrl(deal.link, '#');
+        const safeImage = safeUrl(deal.image, '');
+        const safeLink = safeUrl(deal.link, '#');
 
         gsap.to(this.offerContainer, {
             opacity: 0, duration: 0.3, onComplete: () => {
@@ -1434,11 +1293,36 @@ document.addEventListener('DOMContentLoaded', () => {
 // ═══════════════════════════════════════════════════════════════
 // Registro del Service Worker — diferido tras `load` con
 // requestIdleCallback para no competir con el LCP del hero.
+// Flujo de actualización: la versión nueva queda en 'waiting', se
+// notifica con un toast accionable y solo se activa si el usuario
+// acepta (SKIP_WAITING → controllerchange → reload).
 // ═══════════════════════════════════════════════════════════════
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         const registerSW = () => {
             navigator.serviceWorker.register('./service-worker.js')
+                .then((registration) => {
+                    const notifyUpdate = (worker) => {
+                        window.dispatchEvent(new CustomEvent('sw-update-available', {
+                            detail: { worker }
+                        }));
+                    };
+
+                    // ¿Ya había una versión esperando de una visita anterior?
+                    if (registration.waiting && navigator.serviceWorker.controller) {
+                        notifyUpdate(registration.waiting);
+                    }
+
+                    registration.addEventListener('updatefound', () => {
+                        const newWorker = registration.installing;
+                        if (!newWorker) return;
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                notifyUpdate(newWorker);
+                            }
+                        });
+                    });
+                })
                 .catch(err => console.warn('[PWA] Registro de SW fallido:', err));
         };
         if ('requestIdleCallback' in window) {
@@ -1446,5 +1330,13 @@ if ('serviceWorker' in navigator) {
         } else {
             setTimeout(registerSW, 1000);
         }
+    });
+
+    // Cuando el SW nuevo toma el control tras SKIP_WAITING → recargar una vez
+    let hasRefreshed = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (hasRefreshed) return;
+        hasRefreshed = true;
+        window.location.reload();
     });
 }

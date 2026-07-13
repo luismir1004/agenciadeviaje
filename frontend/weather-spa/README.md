@@ -96,8 +96,9 @@ La aplicación sigue un principio estricto de **Separación de Responsabilidades
 | **Campos Privados** | `#field` protege estado interno de mutación externa |
 | **Inmutabilidad** | `Config.js` con deep-freeze recursivo real (`deepFreeze()`) |
 | **Fail Gracefully** | Fallbacks en parser, cache, y red sin romper UX |
-| **Sin Frameworks** | Vanilla JS (ES6+) sin frameworks runtime; las librerías (GSAP, Chart.js, Leaflet, localforage) llegan por CDN con versión fijada + SRI |
-| **Seguridad** | CSP con allowlist de orígenes, sanitización de datos externos, SRI en CDNs |
+| **Sin Frameworks** | Vanilla JS (ES Modules nativos) sin frameworks runtime; librerías self-hosted en `vendor/` con versiones exactas fijadas en package.json |
+| **Seguridad** | CSP estricta (`script-src 'self'` — cero orígenes de script externos), sanitización de datos externos |
+| **Testeado** | 23 tests unitarios (parser, sanitize, cache) + 12 e2e en Chromium (`npm test`) |
 
 ---
 
@@ -112,7 +113,7 @@ La aplicación sigue un principio estricto de **Separación de Responsabilidades
 | **Tailwind CSS** | 3.4 (compilado) | Utility classes; `tailwind-dist.css` se genera con `npm run build:css` |
 | **CSS Custom Properties** | — | Design System con variables dinámicas |
 
-### Librerías Externas (CDN)
+### Librerías (self-hosted en `vendor/`)
 
 | Librería | Rol en la App |
 |---|---|
@@ -121,7 +122,7 @@ La aplicación sigue un principio estricto de **Separación de Responsabilidades
 | **Leaflet.js 1.9** | Mapa satelital con tiles CARTO Light. Animaciones `flyTo()` con zoom dinámico al cambiar de ciudad. Popups info con coordenadas. |
 | **FontAwesome 6.4** | Sistema de iconografía climática (☀️→`fa-sun`, 🌧→`fa-cloud-rain`). |
 
-> **Tipografías** (Fraunces + Inter, variables, subset latin) **self-hosted** en `fonts/` — sin dependencia de Google Fonts (menos latencia, sin IP-logging de terceros, cacheables por el SW).
+> Todas las librerías y tipografías son **self-hosted** (`vendor/` y `fonts/`, versiones exactas de npm): sin CDNs de terceros, la CSP queda en `script-src 'self'` y el único origen externo restante son las imágenes (Unsplash/CARTO) y las APIs meteorológicas.
 
 ### APIs Nativas del Navegador
 

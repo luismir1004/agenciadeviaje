@@ -3,22 +3,22 @@
  *
  * Levanta la app en un servidor estático local y la ejecuta en Chromium
  * con el entorno completamente determinista:
- *  - Los CDNs (Chart.js, GSAP, Leaflet, localforage, Font Awesome) se
- *    sirven desde node_modules con los MISMOS bytes que producción, así
- *    los hashes SRI del index.html se validan de verdad.
+ *  - Librerías, fuentes e iconos son self-hosted (vendor/, fonts/) y los
+ *    sirve el propio servidor estático — sin dependencias externas.
  *  - La API 7Timer se stubbea con temperaturas distintas por ciudad
  *    (derivadas de la latitud) para poder detectar datos obsoletos.
  *  - Tiles/imágenes remotas → PNG 1x1. Todo lo demás externo → abort.
  *  - Service workers bloqueados: Playwright no intercepta sus fetches,
  *    lo que haría los tests no deterministas.
  */
-const { chromium } = require('playwright');
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
+import { chromium } from 'playwright';
+import http from 'http';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const APP = path.resolve(__dirname, '..', '..');
-const NM = path.join(APP, 'node_modules');
 
 const MIME = {
     '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css',
@@ -31,7 +31,7 @@ const PIXEL = Buffer.from(
     'base64');
 
 /** Temperatura base determinista por ciudad (según latitud). */
-function baseTempForLat(lat) {
+export function baseTempForLat(lat) {
     return Math.round(lat % 30);
 }
 
@@ -74,7 +74,7 @@ function createStaticServer() {
  * @returns {{ page, browser, pageErrors, api, close }}
  *   api.delayMs — latencia configurable de 7Timer (para tests de races)
  */
-async function launchApp() {
+export async function launchApp() {
     const server = createStaticServer();
     await new Promise(r => server.listen(0, '127.0.0.1', r));
     const origin = `http://127.0.0.1:${server.address().port}`;
@@ -102,32 +102,11 @@ async function launchApp() {
     page.on('pageerror', e => pageErrors.push(e.message));
 
     const api = { delayMs: 0 };
-    const serveLocal = (route, file, type) => route.fulfill({
-        body: fs.readFileSync(file),
-        headers: { 'Content-Type': type, 'Access-Control-Allow-Origin': '*' }
-    });
 
     await page.route('**/*', async (route) => {
         const url = route.request().url();
+        // Librerías y fuentes son self-hosted: las sirve el servidor estático.
         if (url.startsWith(origin)) return route.continue();
-        if (url.includes('chart.js@4.4.1/dist/chart.umd.js'))
-            return serveLocal(route, path.join(NM, 'chart.js/dist/chart.umd.js'), 'application/javascript');
-        if (url.includes('gsap@3.12.2/dist/gsap.min.js'))
-            return serveLocal(route, path.join(NM, 'gsap/dist/gsap.min.js'), 'application/javascript');
-        if (url.includes('localforage@1.10.0/dist/localforage.min.js'))
-            return serveLocal(route, path.join(NM, 'localforage/dist/localforage.min.js'), 'application/javascript');
-        if (url.includes('fontawesome-free@6.4.0/css/all.min.css'))
-            return serveLocal(route, path.join(NM, '@fortawesome/fontawesome-free/css/all.min.css'), 'text/css');
-        if (url.includes('fontawesome-free@6.4.0/webfonts/')) {
-            const f = path.join(NM, '@fortawesome/fontawesome-free/webfonts',
-                url.split('/webfonts/')[1].split('?')[0]);
-            if (fs.existsSync(f)) return serveLocal(route, f, 'font/woff2');
-            return route.abort();
-        }
-        if (url.includes('unpkg.com/leaflet@1.9.4/dist/leaflet.js'))
-            return serveLocal(route, path.join(NM, 'leaflet/dist/leaflet.js'), 'application/javascript');
-        if (url.includes('unpkg.com/leaflet@1.9.4/dist/leaflet.css'))
-            return serveLocal(route, path.join(NM, 'leaflet/dist/leaflet.css'), 'text/css');
         if (url.includes('7timer.info')) {
             if (api.delayMs) await new Promise(r => setTimeout(r, api.delayMs));
             return route.fulfill({
@@ -157,7 +136,7 @@ async function launchApp() {
 }
 
 /** Snapshot del estado observable de la app. */
-async function snapshot(page) {
+export async function snapshot(page) {
     return page.evaluate(() => ({
         bentoTemp: document.querySelector('#bento-main .temp-display')?.textContent.trim().match(/-?\d+/)?.[0] ?? null,
         popupTemp: document.querySelector('#popup-temp')?.textContent.trim().match(/-?\d+/)?.[0] ?? null,
@@ -176,10 +155,8 @@ async function snapshot(page) {
 }
 
 /** Selecciona una ciudad por índice a través del dropdown real. */
-async function selectCity(page, index) {
+export async function selectCity(page, index) {
     await page.click('#city-trigger');
     await page.waitForTimeout(350);
     await page.click(`[data-value="${index}"]`);
 }
-
-module.exports = { launchApp, snapshot, selectCity, baseTempForLat };

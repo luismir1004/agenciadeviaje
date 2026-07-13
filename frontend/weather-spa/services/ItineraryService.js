@@ -1,8 +1,10 @@
+import { APP_CONFIG } from './Config.js';
+
 /**
  * ItineraryService
  * Simulation of an AI that generates travel plans based on weather data.
  */
-class ItineraryService {
+export class ItineraryService {
     #activities;
 
     constructor() {

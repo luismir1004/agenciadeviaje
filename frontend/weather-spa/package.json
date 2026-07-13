@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "NextGen Europa — Weather SPA (PWA) para viajeros europeos",
   "private": true,
+  "type": "module",
   "main": "app.js",
   "scripts": {
     "dev": "vite",
@@ -10,18 +11,23 @@
     "build:css": "npx tailwindcss -i ./input.css -o ./tailwind-dist.css --minify",
     "build:minify": "node build.js",
     "build": "npm run build:css && npm run build:minify",
-    "test": "node --test tests/e2e/*.test.js",
-    "test:e2e": "node --test tests/e2e/*.test.js"
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:e2e": "node --test tests/e2e/*.test.js",
+    "test:unit": "node --test tests/unit/*.test.js",
+    "lint": "eslint app.js build.js services/ tests/"
   },
   "keywords": [],
   "author": "",
   "license": "UNLICENSED",
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@fontsource-variable/fraunces": "^5.2.9",
     "@fontsource-variable/inter": "^5.2.8",
     "@fortawesome/fontawesome-free": "6.4.0",
     "chart.js": "4.4.1",
     "clean-css-cli": "^5.6.3",
+    "eslint": "^10.7.0",
+    "globals": "^17.7.0",
     "gsap": "3.12.2",
     "leaflet": "1.9.4",
     "localforage": "1.10.0",

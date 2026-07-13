@@ -1,9 +1,11 @@
+import { APP_CONFIG } from './Config.js';
+
 /**
  * ExperienceManager
  * Handles immersive backgrounds (Unsplash) and audio atmosphere.
  * Builds display-ready URLs from frozen Config data without mutating it.
  */
-class ExperienceManager {
+export class ExperienceManager {
     #audioElement;
     #audioBtn;
     #isMuted = true;

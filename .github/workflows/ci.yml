@@ -7,7 +7,7 @@ on:
 
 jobs:
   test:
-    name: Sintaxis · Build · E2E
+    name: Lint · Build · Unit · E2E
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -25,11 +25,8 @@ jobs:
       - name: Instalar dependencias
         run: npm ci
 
-      - name: Verificar sintaxis JS
-        run: |
-          for f in app.js service-worker.js build.js services/*.js tests/e2e/*.js; do
-            node --check "$f"
-          done
+      - name: ESLint
+        run: npm run lint
 
       - name: Compilar Tailwind
         run: npm run build:css
@@ -37,10 +34,13 @@ jobs:
       - name: Comprobar que tailwind-dist.css está al día
         run: git diff --exit-code tailwind-dist.css
 
+      - name: Tests unitarios
+        run: npm run test:unit
+
       - name: Instalar Chromium (Playwright)
         run: npx playwright install --with-deps chromium
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: ''
 
       - name: Suite e2e
-        run: npm test
+        run: npm run test:e2e

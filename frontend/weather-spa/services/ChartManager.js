@@ -1,9 +1,11 @@
+import { REDUCED_MOTION } from './Config.js';
+
 /**
  * ChartManager Pro — Meridian Editorial Edition
  * Chart.js wrapper con paleta clara (papel/tinta), línea animada,
  * tooltips custom y anotaciones min/max con acento dinámico.
  */
-class ChartManager {
+export class ChartManager {
     #ctx;
     #chartInstance = null;
     #currentForecasts = [];
@@ -64,7 +66,7 @@ class ChartManager {
             }
         };
 
-        const reducedMotion = typeof REDUCED_MOTION !== 'undefined' && REDUCED_MOTION;
+        const reducedMotion = REDUCED_MOTION;
 
         // Animated line draw plugin
         const lineDrawPlugin = {

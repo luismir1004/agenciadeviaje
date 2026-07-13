@@ -1,11 +1,12 @@
+import { REDUCED_MOTION } from './Config.js';
+
 /**
  * HeroManager.js
  * Manages the high-performance, cinematic hero section.
  * Handles staggered text reveals, background transitions, and UI state.
  * Uses a Front/Back layer pool to prevent DOM accumulation.
  */
-class HeroManager {
-    #heroSection;
+export class HeroManager {
     #title;
     #subtitle;
     #cityDisplay;
@@ -16,7 +17,6 @@ class HeroManager {
     #layerBack = null;
 
     constructor() {
-        this.#heroSection = document.getElementById('hero-section');
         this.#title = document.querySelector('.hero-title');
         this.#subtitle = document.querySelector('.hero-subtitle');
         this.#cityDisplay = document.getElementById('hero-city-display');

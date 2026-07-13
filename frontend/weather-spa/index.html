@@ -8,10 +8,10 @@
 
     <!-- Content Security Policy (allowlist de CDNs y APIs usadas) -->
     <meta http-equiv="Content-Security-Policy" content="default-src 'self';
-        script-src 'self' https://cdn.jsdelivr.net https://unpkg.com;
-        style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com;
-        font-src 'self' https://cdn.jsdelivr.net;
-        img-src 'self' data: blob: https://images.unsplash.com https://plus.unsplash.com https://*.basemaps.cartocdn.com https://unpkg.com;
+        script-src 'self';
+        style-src 'self' 'unsafe-inline';
+        font-src 'self';
+        img-src 'self' data: blob: https://images.unsplash.com https://plus.unsplash.com https://*.basemaps.cartocdn.com;
         connect-src 'self' https://www.7timer.info https://api.open-meteo.com;
         media-src 'self' https://assets.mixkit.co;
         worker-src 'self';
@@ -25,6 +25,12 @@
     <meta property="og:title" content="NextGen Europa | Forecast Editorial">
     <meta property="og:description"
         content="El clima de las capitales europeas en una experiencia editorial de primera clase.">
+    <meta property="og:type" content="website">
+    <!-- og:image debe ser URL absoluta en producción: prefijar con el dominio final -->
+    <meta property="og:image" content="/og-image.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="NextGen Europa | Forecast Editorial">
+    <meta name="twitter:image" content="/og-image.png">
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="icons/icon-192x192.svg">
@@ -41,14 +47,15 @@
          @font-face en styles.css. Preload de las variantes críticas. -->
     <link rel="preload" as="font" type="font/woff2" href="fonts/fraunces-latin-opsz-normal.woff2" crossorigin>
     <link rel="preload" as="font" type="font/woff2" href="fonts/inter-latin-wght-normal.woff2" crossorigin>
+    <link rel="modulepreload" href="services/Config.js">
+    <link rel="modulepreload" href="services/sanitize.js">
+    <link rel="modulepreload" href="services/forecastParser.js">
 
-    <!-- Icons (Font Awesome — versión fijada + SRI) -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css"
-        integrity="sha384-iw3OoTErCYJJB9mCa8LNS2hbsQ7M3C0EpIsO/H5+EGAkPGc6rk+V8i04oW/K5xq0" crossorigin="anonymous">
+    <!-- Icons (Font Awesome 6.4.0 — self-hosted) -->
+    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css">
 
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <!-- Leaflet CSS 1.9.4 (self-hosted) -->
+    <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
 
     <!-- Tailwind Compiled CSS -->
     <link rel="stylesheet" href="tailwind-dist.css">
@@ -60,19 +67,10 @@
     <link rel="preload" as="image"
         href="https://images.unsplash.com/photo-1539037116277-4db20889f2d4?q=85&w=1920&auto=format&fit=crop">
 
-    <!-- Chart.js CDN (versión fijada + SRI) -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"
-        integrity="sha384-dug+JxfBvklEQdJ4AYuBBAIScUz0bVN73xpy273gcAwHjb3qI0fXmuYNaNfdyYJG"
-        crossorigin="anonymous"></script>
-
-    <!-- GSAP CDN (versión fijada + SRI) -->
-    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.2/dist/gsap.min.js"
-        integrity="sha384-d+vyQ0dYcymoP8ndq2hW7FGC50nqGdXUEgoOUGxbbkAJwZqL7h+jKN0GGgn9hFDS"
-        crossorigin="anonymous"></script>
-
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- Librerías self-hosted (versiones exactas fijadas en package.json) -->
+    <script src="vendor/chart.umd.js"></script>
+    <script src="vendor/gsap.min.js"></script>
+    <script src="vendor/leaflet/leaflet.js"></script>
 
     <!-- Custom Styles -->
     <link rel="stylesheet" href="styles.css?v=3">
@@ -395,20 +393,34 @@
         </footer>
     </main>
 
-    <!-- LocalForage CDN para IndexedDB (versión fijada + SRI) -->
-    <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"
-        integrity="sha384-MTDrIlFOzEqpmOxY6UIA/1Zkh0a64UlmJ6R0UrZXqXCPx99siPGi8EmtQjIeCcTH"
-        crossorigin="anonymous"></script>
+    <!-- LocalForage (self-hosted) -->
+    <script src="vendor/localforage.min.js"></script>
 
-    <!-- Scripts (Config.js primero: es la fuente de datos del resto) -->
-    <script src="services/Config.js" defer></script>
-    <script src="services/CacheManager.js" defer></script>
-    <script src="services/HeroManager.js" defer></script>
-    <script src="services/ExperienceManager.js" defer></script>
-    <script src="services/ItineraryService.js" defer></script>
-    <script src="services/ChartManager.js" defer></script>
-    <script src="services/UIManager.js" defer></script>
-    <script src="app.js" defer></script>
+    <!-- Datos estructurados -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "NextGen Europa — Weather Forecast",
+        "description": "Pronóstico meteorológico editorial de 7 días para las capitales europeas, con itinerarios según el clima.",
+        "applicationCategory": "TravelApplication",
+        "operatingSystem": "Web",
+        "inLanguage": "es",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" }
+    }
+    </script>
+
+    <noscript>
+        <div style="max-width:42rem;margin:4rem auto;padding:0 1.5rem;font-family:system-ui,sans-serif;text-align:center">
+            <h1>NextGen Europa — Forecast</h1>
+            <p>Pronóstico meteorológico de 7 días para Madrid, Londres, París, Berlín,
+            Roma, Barcelona y Ámsterdam. Esta aplicación necesita JavaScript activado.</p>
+        </div>
+    </noscript>
+
+    <!-- App: ES Modules — app.js importa Config y todos los servicios,
+         el orden lo garantiza el grafo de imports (no el orden de tags) -->
+    <script type="module" src="app.js"></script>
 </body>
 
 </html>

@@ -2,7 +2,7 @@
  * UIManager Service
  * Handles interaction feedback like Toast notifications and loading states.
  */
-class UIManager {
+export class UIManager {
     #toastContainer;
 
     constructor() {
@@ -11,10 +11,12 @@ class UIManager {
 
     /**
      * Show a premium toast notification
-     * @param {string} message 
-     * @param {'info'|'success'|'error'} type 
+     * @param {string} message
+     * @param {'info'|'success'|'error'|'warning'} type
+     * @param {{ action?: { label: string, handler: Function }, duration?: number }} [opts]
+     *        action: botón de acción (p.ej. "Recargar" para actualizaciones del SW)
      */
-    showToast(message, type = 'info') {
+    showToast(message, type = 'info', opts = {}) {
         const toast = document.createElement('div');
         toast.className = `toast toast-${type}`;
 
@@ -47,6 +49,19 @@ class UIManager {
 
         col.append(label, msg);
         row.append(iconEl, col);
+
+        // Botón de acción opcional (texto seguro vía textContent)
+        if (opts.action && typeof opts.action.handler === 'function') {
+            const btn = document.createElement('button');
+            btn.className = 'toast-action';
+            btn.textContent = opts.action.label || 'Aceptar';
+            btn.addEventListener('click', () => {
+                opts.action.handler();
+                if (toast.parentNode) toast.remove();
+            });
+            row.appendChild(btn);
+        }
+
         toast.appendChild(row);
 
         this.#toastContainer.appendChild(toast);
@@ -57,13 +72,14 @@ class UIManager {
             { x: 0, opacity: 1, scale: 1, duration: 0.8, ease: "power2.out" }
         );
 
-        // Auto removal
+        // Auto removal (los toasts con acción viven más para dar tiempo a decidir)
+        const lifetime = opts.duration ?? (opts.action ? 15000 : 4000);
         setTimeout(() => {
             gsap.to(toast, {
                 opacity: 0, x: 20, duration: 0.4, onComplete: () => {
                     if (toast.parentNode) toast.remove();
                 }
             });
-        }, 4000);
+        }, lifetime);
     }
 }

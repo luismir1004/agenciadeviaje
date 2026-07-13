@@ -9,14 +9,15 @@
  * Output: /dist (ready to deploy)
  */
 
-const { execSync } = require('child_process');
-const fs = require('fs');
-const path = require('path');
+import { execSync } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-const ROOT = __dirname;
+const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const DIST = path.join(ROOT, 'dist');
 
-// Files to minify
+// Files to minify (ES Modules → terser con --module)
 const JS_FILES = [
     'app.js',
     'services/Config.js',
@@ -25,7 +26,9 @@ const JS_FILES = [
     'services/UIManager.js',
     'services/HeroManager.js',
     'services/ExperienceManager.js',
-    'services/ItineraryService.js'
+    'services/ItineraryService.js',
+    'services/sanitize.js',
+    'services/forecastParser.js'
 ];
 
 const CSS_FILES = [
@@ -47,10 +50,12 @@ const COPY_FILES = [
     'icons/apple-touch-icon.png',
     'tailwind-dist.css',
     'data/deals.json',
-    'fonts/fraunces-latin-opsz-normal.woff2',
-    'fonts/fraunces-latin-opsz-italic.woff2',
-    'fonts/inter-latin-wght-normal.woff2'
+    'robots.txt',
+    'og-image.png'
 ];
+
+// Directorios copiados recursivamente tal cual (assets binarios/vendor)
+const COPY_DIRS = ['fonts', 'vendor'];
 
 // ─────────────────────────────────────────────
 // Helpers
@@ -99,6 +104,7 @@ JS_FILES.forEach(file => {
     try {
         execSync(
             `npx terser "${src}" ` +
+            `--module ` +
             `--compress drop_console=true,passes=2 ` +
             `--mangle ` +
             `--comments false ` +
@@ -156,6 +162,16 @@ COPY_FILES.forEach(file => {
         console.log(`   ✓ ${file}`);
     } else {
         console.warn(`   ⚠ ${file} not found, skipping`);
+    }
+});
+
+COPY_DIRS.forEach(dir => {
+    const src = path.join(ROOT, dir);
+    if (fs.existsSync(src)) {
+        fs.cpSync(src, path.join(DIST, dir), { recursive: true });
+        console.log(`   ✓ ${dir}/ (recursivo)`);
+    } else {
+        console.warn(`   ⚠ ${dir}/ not found, skipping`);
     }
 });
 
