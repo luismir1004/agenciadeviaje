@@ -12,7 +12,7 @@
         style-src 'self' 'unsafe-inline';
         font-src 'self';
         img-src 'self' data: blob: https://images.unsplash.com https://plus.unsplash.com https://*.basemaps.cartocdn.com;
-        connect-src 'self' https://www.7timer.info https://api.open-meteo.com;
+        connect-src 'self' https://www.7timer.info https://api.open-meteo.com https://geocoding-api.open-meteo.com;
         media-src 'self' https://assets.mixkit.co;
         worker-src 'self';
         manifest-src 'self';
@@ -38,7 +38,8 @@
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 
     <!-- PWA Meta Tags -->
-    <meta name="theme-color" content="#F6F5F1">
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F6F5F1">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#111318">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="NextGen Europa">
@@ -207,6 +208,9 @@
         <!-- Toast Container (z > mapa expandido para no quedar tapado) -->
         <div id="toast-container" class="fixed bottom-5 right-5 z-[1100] flex flex-col gap-3 pointer-events-none"
             aria-live="polite" role="status"></div>
+
+        <!-- Anuncios para lectores de pantalla (cambios de pronóstico) -->
+        <div id="sr-status" class="sr-only" aria-live="polite" role="status"></div>
 
         <section class="flex-grow flex flex-col">
 

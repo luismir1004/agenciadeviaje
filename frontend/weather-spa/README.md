@@ -43,7 +43,9 @@ NextGen Europa es una **Single Page Application** que ofrece pronósticos meteor
 
 | Feature | Descripción |
 |---|---|
-| **Pronóstico Extendido** | 7 días con temperaturas máx/mín y código climático |
+| **Pronóstico Extendido** | 7 días con temperaturas máx/mín, viento y código climático |
+| **Buscador Global** | Cualquier ciudad del mundo vía Open-Meteo Geocoding (búsqueda con debounce en el selector) |
+| **Modo Oscuro** | `prefers-color-scheme` completo: tokens, gráfico, mapa (tiles dark) y acentos AA por tema |
 | **Motor de Temas Dinámicos** | El color de acento (tipografía, gráfico, fondos) muta según el clima dominante |
 | **Chart Pro** | Gráfico con tooltips climáticos y anotaciones min/max |
 | **Mapa Satelital** | Leaflet.js con tiles CARTO Light y animaciones `flyTo` |
@@ -52,6 +54,8 @@ NextGen Europa es una **Single Page Application** que ofrece pronósticos meteor
 | **Feedback Háptico** | Micro-sonido via Web Audio API al cambiar de ciudad |
 | **Itinerario Inteligente** | Generador de planes diarios según clima (simulación basada en reglas, no un LLM) |
 | **Geolocalización** | Pronóstico de tu ubicación actual bajo demanda (botón dedicado) |
+
+> **Datos:** Open-Meteo es la API primaria (probabilidad de precipitación y viento reales); 7Timer actúa como fallback con reintentos exponenciales, e IndexedDB como último recurso offline.
 
 ---
 

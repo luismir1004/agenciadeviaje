@@ -35,7 +35,7 @@ export function baseTempForLat(lat) {
     return Math.round(lat % 30);
 }
 
-/** Respuesta 7Timer simulada: init de hoy 00Z + 7 días × 8 puntos de 3 h. */
+/** Respuesta 7Timer simulada (fallback): init hoy 00Z + 7 días × 8 puntos. */
 function fake7timer(url) {
     const u = new URL(url);
     const lat = parseFloat(u.searchParams.get('lat'));
@@ -44,16 +44,61 @@ function fake7timer(url) {
     for (let d = 0; d < 7; d++) {
         for (let h = 0; h < 8; h++) {
             dataseries.push({
-                timepoint: d * 24 + h * 3 + 3,
+                timepoint: d * 24 + h * 3,
                 temp2m: baseTemp + d,
                 weather: 'clearday',
-                prec_type: 'none'
+                prec_type: 'none',
+                wind10m: { direction: 'N', speed: 3 }
             });
         }
     }
     const now = new Date();
     const init = `${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, '0')}${String(now.getUTCDate()).padStart(2, '0')}00`;
     return JSON.stringify({ product: 'civil', init, dataseries });
+}
+
+/** Respuesta Open-Meteo simulada (API primaria): daily de 7 días. */
+function fakeOpenMeteo(url) {
+    const u = new URL(url);
+    const lat = parseFloat(u.searchParams.get('latitude'));
+    const baseTemp = baseTempForLat(lat);
+    const days = 7;
+    const time = [], tmax = [], tmin = [], code = [], prob = [], wind = [];
+    const today = new Date();
+    for (let d = 0; d < days; d++) {
+        const dt = new Date(today.getTime() + d * 86400000);
+        time.push(dt.toISOString().slice(0, 10));
+        tmax.push(baseTemp + d);
+        tmin.push(baseTemp + d - 5);
+        code.push(0);            // despejado
+        prob.push(d === 2 ? 88 : 0);
+        wind.push(14 + d);
+    }
+    return JSON.stringify({
+        daily: {
+            time,
+            temperature_2m_max: tmax,
+            temperature_2m_min: tmin,
+            weathercode: code,
+            precipitation_probability_max: prob,
+            windspeed_10m_max: wind
+        }
+    });
+}
+
+/** Resultados de geocoding simulados para el buscador. */
+function fakeGeocoding(url) {
+    const u = new URL(url);
+    const name = (u.searchParams.get('name') || '').toLowerCase();
+    const results = name.startsWith('aten') ? [{
+        name: 'Atenas',
+        country: 'Grecia',
+        admin1: 'Ática',
+        latitude: 37.98,
+        longitude: 23.72,
+        timezone: 'Europe/Athens'
+    }] : [];
+    return JSON.stringify({ results });
 }
 
 function createStaticServer() {
@@ -101,12 +146,28 @@ export async function launchApp() {
     const pageErrors = [];
     page.on('pageerror', e => pageErrors.push(e.message));
 
-    const api = { delayMs: 0 };
+    const api = { delayMs: 0, failOpenMeteo: false };
 
     await page.route('**/*', async (route) => {
         const url = route.request().url();
         // Librerías y fuentes son self-hosted: las sirve el servidor estático.
         if (url.startsWith(origin)) return route.continue();
+        if (url.includes('geocoding-api.open-meteo.com')) {
+            return route.fulfill({
+                body: fakeGeocoding(url),
+                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+            });
+        }
+        if (url.includes('api.open-meteo.com')) {
+            if (api.delayMs) await new Promise(r => setTimeout(r, api.delayMs));
+            if (api.failOpenMeteo) {
+                return route.fulfill({ status: 500, body: '{}', headers: { 'Access-Control-Allow-Origin': '*' } });
+            }
+            return route.fulfill({
+                body: fakeOpenMeteo(url),
+                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+            });
+        }
         if (url.includes('7timer.info')) {
             if (api.delayMs) await new Promise(r => setTimeout(r, api.delayMs));
             return route.fulfill({
@@ -154,9 +215,11 @@ export async function snapshot(page) {
     }));
 }
 
-/** Selecciona una ciudad por índice a través del dropdown real. */
+/** Selecciona una ciudad por índice a través del dropdown real.
+ *  Click vía DOM: la caja de búsqueda sticky puede solapar los items al
+ *  auto-scrollear, lo que bloquearía el click posicional de Playwright. */
 export async function selectCity(page, index) {
     await page.click('#city-trigger');
     await page.waitForTimeout(350);
-    await page.click(`[data-value="${index}"]`);
+    await page.locator(`[data-value="${index}"]`).evaluate(el => el.click());
 }

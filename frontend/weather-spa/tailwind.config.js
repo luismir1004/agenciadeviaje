@@ -8,21 +8,23 @@ export default {
                 serif: ['Fraunces', 'Georgia', 'serif'],
             },
             colors: {
-                paper: '#F6F5F1',
-                surface: '#FFFFFF',
+                // Canales RGB variables: las utilidades siguen el modo
+                // claro/oscuro y conservan los modificadores /opacidad
+                paper: 'rgb(var(--paper-rgb) / <alpha-value>)',
+                surface: 'rgb(var(--surface-rgb) / <alpha-value>)',
                 ink: {
-                    DEFAULT: '#17191E',
-                    soft: '#565B64',
-                    faint: '#6B6E74',
+                    DEFAULT: 'rgb(var(--ink-rgb) / <alpha-value>)',
+                    soft: 'rgb(var(--ink-soft-rgb) / <alpha-value>)',
+                    faint: 'rgb(var(--ink-faint-rgb) / <alpha-value>)',
                 },
-                hairline: '#E6E3DB',
+                hairline: 'rgb(var(--hairline-rgb) / <alpha-value>)',
                 accent: {
                     DEFAULT: 'var(--brand-accent)',
                     dim: 'var(--brand-dim)',
                     strong: 'var(--brand-accent-text)',
                 },
                 // Alias heredado del diseño anterior; ahora apunta a paper
-                midnight: '#F6F5F1',
+                midnight: 'rgb(var(--paper-rgb) / <alpha-value>)',
             }
         }
     },

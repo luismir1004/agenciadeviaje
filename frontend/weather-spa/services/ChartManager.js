@@ -9,6 +9,8 @@ export class ChartManager {
     #ctx;
     #chartInstance = null;
     #currentForecasts = [];
+    #badgeBg = 'rgba(255, 255, 255, 0.96)';
+    #badgeBorder = 'rgba(23, 25, 30, 0.12)';
 
     constructor(canvasId) {
         const canvas = document.getElementById(canvasId);
@@ -36,9 +38,22 @@ export class ChartManager {
         const maxIdx = maxTemps.indexOf(globalMax);
         const minIdx = minTemps.indexOf(globalMin);
 
-        // Get theme-aware accent color
-        const themeAccent = getComputedStyle(document.documentElement)
-            .getPropertyValue('--brand-accent').trim() || '#2563EB';
+        // Colores derivados de los tokens del design system — así el chart
+        // respeta automáticamente el modo claro/oscuro y el tema por clima
+        const rootStyles = getComputedStyle(document.documentElement);
+        const themeAccent = rootStyles.getPropertyValue('--brand-accent').trim() || '#2563EB';
+        const inkToken = rootStyles.getPropertyValue('--ink').trim() || '#17191E';
+        const inkSoftToken = rootStyles.getPropertyValue('--ink-soft').trim() || '#565B64';
+        const surfaceToken = rootStyles.getPropertyValue('--surface').trim() || '#FFFFFF';
+
+        const tickColor = this.#hexToRgba(inkSoftToken, 0.85);
+        const gridColor = this.#hexToRgba(inkToken, 0.08);
+        const mutedLine = this.#hexToRgba(inkToken, 0.25);
+        const mutedPoint = this.#hexToRgba(inkToken, 0.15);
+        const mutedPointBorder = this.#hexToRgba(inkToken, 0.30);
+        const minAccent = this.#hexToRgba(inkSoftToken, 0.9);
+        this.#badgeBg = this.#hexToRgba(surfaceToken, 0.96);
+        this.#badgeBorder = this.#hexToRgba(inkToken, 0.12);
 
         // Dark gradient fill (blue glow)
         const gradientMax = this.#ctx.createLinearGradient(0, 0, 0, 300);
@@ -61,7 +76,7 @@ export class ChartManager {
 
                 if (metaMin.data[minIdx]) {
                     const ptMin = metaMin.data[minIdx];
-                    this.#drawAnnotation(ctx, ptMin.x, ptMin.y, `${globalMin}°`, 'rgba(86,91,100,0.9)', '▼', 22);
+                    this.#drawAnnotation(ctx, ptMin.x, ptMin.y, `${globalMin}°`, minAccent, '▼', 22);
                 }
             }
         };
@@ -121,10 +136,10 @@ export class ChartManager {
                         tension: 0.45,
                         fill: true,
                         pointBackgroundColor: maxTemps.map((_, i) =>
-                            i === maxIdx ? themeAccent : 'rgba(23,25,30,0.15)'
+                            i === maxIdx ? themeAccent : mutedPoint
                         ),
                         pointBorderColor: maxTemps.map((_, i) =>
-                            i === maxIdx ? themeAccent : 'rgba(23,25,30,0.30)'
+                            i === maxIdx ? themeAccent : mutedPointBorder
                         ),
                         pointRadius: maxTemps.map((_, i) =>
                             i === maxIdx ? 6 : 3
@@ -137,15 +152,15 @@ export class ChartManager {
                     {
                         label: 'Mínima',
                         data: minTemps,
-                        borderColor: 'rgba(23, 25, 30, 0.25)',
+                        borderColor: mutedLine,
                         borderWidth: 1.5,
                         borderDash: [5, 5],
                         tension: 0.45,
                         fill: false,
                         pointBackgroundColor: minTemps.map((_, i) =>
-                            i === minIdx ? 'rgba(86,91,100,0.9)' : 'rgba(23,25,30,0.12)'
+                            i === minIdx ? minAccent : mutedPoint
                         ),
-                        pointBorderColor: 'rgba(23,25,30,0.2)',
+                        pointBorderColor: mutedPointBorder,
                         pointRadius: minTemps.map((_, i) =>
                             i === minIdx ? 6 : 2
                         ),
@@ -168,7 +183,7 @@ export class ChartManager {
                 plugins: {
                     legend: {
                         labels: {
-                            color: 'rgba(86, 91, 100, 0.9)',
+                            color: tickColor,
                             font: { family: 'Inter', size: 10, weight: 500 },
                             usePointStyle: true,
                             boxWidth: 5,
@@ -185,15 +200,15 @@ export class ChartManager {
                     x: {
                         grid: { display: false },
                         ticks: {
-                            color: 'rgba(86, 91, 100, 0.8)',
+                            color: tickColor,
                             font: { family: 'Inter', size: 10, weight: 500 }
                         },
                         border: { display: false }
                     },
                     y: {
-                        grid: { color: 'rgba(23, 25, 30, 0.06)' },
+                        grid: { color: gridColor },
                         ticks: {
-                            color: 'rgba(86, 91, 100, 0.8)',
+                            color: tickColor,
                             font: { family: 'Inter', size: 10 },
                             callback: (val) => `${val}°`
                         },
@@ -231,12 +246,12 @@ export class ChartManager {
         const w = metrics.width + padX * 2;
         const h = 16;
 
-        // Dark glass badge background
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
+        // Fondo del badge según tokens (claro/oscuro)
+        ctx.fillStyle = this.#badgeBg;
         ctx.beginPath();
         ctx.roundRect(x - w / 2, badgeY - h / 2 - padY, w, h + padY, 6);
         ctx.fill();
-        ctx.strokeStyle = 'rgba(23, 25, 30, 0.12)';
+        ctx.strokeStyle = this.#badgeBorder;
         ctx.lineWidth = 1;
         ctx.stroke();
 

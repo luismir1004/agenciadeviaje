@@ -5,6 +5,12 @@
 import { APP_CONFIG } from './Config.js';
 
 /**
+ * 7Timer devuelve el viento como categoría 1-8 (escala propia sobre m/s).
+ * Aproximación al punto medio de cada banda, en km/h.
+ */
+const SEVENTIMER_WIND_KMH = { 1: 1, 2: 7, 3: 21, 4: 34, 5: 50, 6: 75, 7: 103, 8: 130 };
+
+/**
  * Convierte la respuesta cruda de 7Timer (o el shape equivalente que
  * produce el fallback Open-Meteo) en resúmenes diarios renderizables.
  *
@@ -60,7 +66,7 @@ export function processForecastData(data, city) {
     series.forEach(point => {
         const { key, dayName, fullDate } = getDateFromOffset(point.timepoint);
         if (!dailyData[key]) {
-            dailyData[key] = { dayName, date: fullDate, temps: [], weathers: [], precipPoints: 0, totalPoints: 0, rainProbs: [] };
+            dailyData[key] = { dayName, date: fullDate, temps: [], weathers: [], precipPoints: 0, totalPoints: 0, rainProbs: [], winds: [] };
         }
 
         // Filter invalid temperatures: -9999 sentinel, null, undefined
@@ -78,6 +84,14 @@ export function processForecastData(data, city) {
         dailyData[key].totalPoints++;
         if (point.prec_type && point.prec_type !== 'none') dailyData[key].precipPoints++;
         if (typeof point.rain_prob === 'number') dailyData[key].rainProbs.push(point.rain_prob);
+
+        // Viento: Open-Meteo adjunta wind_max (km/h reales); 7Timer trae
+        // wind10m.speed como categoría 1-8 que aproximamos a km/h.
+        if (typeof point.wind_max === 'number') {
+            dailyData[key].winds.push(point.wind_max);
+        } else if (point.wind10m && SEVENTIMER_WIND_KMH[point.wind10m.speed]) {
+            dailyData[key].winds.push(SEVENTIMER_WIND_KMH[point.wind10m.speed]);
+        }
     });
 
     // STEP 2: Normalize — apply fallbacks AFTER all chunks are processed
@@ -106,6 +120,8 @@ export function processForecastData(data, city) {
             ? Math.max(...day.rainProbs)
             : (day.totalPoints > 0 ? Math.round((day.precipPoints / day.totalPoints) * 100) : 0);
 
+        const windMax = day.winds.length > 0 ? Math.round(Math.max(...day.winds)) : null;
+
         return {
             dayName: day.dayName,
             date: day.date,
@@ -113,6 +129,7 @@ export function processForecastData(data, city) {
             min: minTemp,
             weather: safeWeather,
             rainChance,
+            windMax,
             ...(APP_CONFIG.WEATHER_MAP[safeWeather] || APP_CONFIG.WEATHER_MAP['clear'])
         };
     });

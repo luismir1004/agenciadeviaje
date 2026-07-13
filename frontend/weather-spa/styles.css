@@ -43,6 +43,14 @@
     --hairline: #E6E3DB;
     --hairline-strong: #D8D4CA;
 
+    /* Canales RGB para las utilidades Tailwind (soportan /opacidad) */
+    --paper-rgb: 246 245 241;
+    --surface-rgb: 255 255 255;
+    --ink-rgb: 23 25 30;
+    --ink-soft-rgb: 86 91 100;
+    --ink-faint-rgb: 107 110 116;
+    --hairline-rgb: 230 227 219;
+
     /* Accent dinámico (lo muta #applyWeatherTheme según el clima).
        --brand-accent-text es la variante oscurecida que cumple AA (>=4.5:1)
        para texto pequeño; el accent base queda para gráficos y display. */
@@ -52,11 +60,45 @@
     --brand-dim: rgba(37, 99, 235, 0.10);
     --brand-glow: rgba(37, 99, 235, 0.15);
 
+    /* Skeleton shimmer (token-driven para soportar modo oscuro) */
+    --skeleton-a: rgba(23, 25, 30, 0.05);
+    --skeleton-b: rgba(23, 25, 30, 0.10);
+
     /* Sombras — suaves, difusas, de papel */
     --shadow-flat: 0 1px 2px rgba(23, 25, 30, 0.05);
     --shadow-elite: 0 1px 2px rgba(23, 25, 30, 0.04), 0 16px 40px -16px rgba(23, 25, 30, 0.12);
     --shadow-floating: 0 2px 4px rgba(23, 25, 30, 0.05), 0 32px 64px -24px rgba(23, 25, 30, 0.18);
     --shadow-glow: 0 8px 32px -8px var(--brand-glow);
+}
+
+/* ── Modo oscuro (tokens AA verificados: ink 14.6:1, ink-soft 7.4:1,
+      ink-faint 6.2:1 sobre superficie) — los acentos de texto los
+      resuelve #applyWeatherTheme con la variante textDark por tema. ── */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --paper: #111318;
+        --paper-deep: #0B0D11;
+        --surface: #191C22;
+        --ink: #ECEDEF;
+        --ink-soft: #A6ABB5;
+        --ink-faint: #969CA6;
+        --hairline: #2A2E36;
+        --hairline-strong: #383D47;
+
+        --paper-rgb: 17 19 24;
+        --surface-rgb: 25 28 34;
+        --ink-rgb: 236 237 239;
+        --ink-soft-rgb: 166 171 181;
+        --ink-faint-rgb: 150 156 166;
+        --hairline-rgb: 42 46 54;
+
+        --skeleton-a: rgba(236, 237, 239, 0.06);
+        --skeleton-b: rgba(236, 237, 239, 0.12);
+
+        --shadow-flat: 0 1px 2px rgba(0, 0, 0, 0.4);
+        --shadow-elite: 0 1px 2px rgba(0, 0, 0, 0.35), 0 16px 40px -16px rgba(0, 0, 0, 0.55);
+        --shadow-floating: 0 2px 4px rgba(0, 0, 0, 0.4), 0 32px 64px -24px rgba(0, 0, 0, 0.7);
+    }
 }
 
 /* ── Base ──────────────────────────────────────────────────────────── */
@@ -447,6 +489,44 @@ h3,
     pointer-events: auto;
 }
 
+/* Caja de búsqueda del combobox de ciudades */
+.city-search-box {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    padding: 0.75rem;
+    background: var(--surface);
+    border-bottom: 1px solid var(--hairline);
+}
+
+.city-search-input {
+    width: 100%;
+    background: var(--paper);
+    border: 1px solid var(--hairline);
+    border-radius: 12px;
+    padding: 0.6rem 0.9rem;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.875rem;
+    color: var(--ink);
+    outline: none;
+    transition: border-color 0.25s ease;
+}
+
+.city-search-input::placeholder {
+    color: var(--ink-faint);
+}
+
+.city-search-input:focus {
+    border-color: var(--brand-accent);
+}
+
+.search-hint {
+    padding: 1rem;
+    text-align: center;
+    color: var(--ink-faint);
+    font-size: 0.75rem;
+}
+
 .dropdown-item {
     transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
     position: relative;
@@ -616,9 +696,9 @@ h3,
    ═══════════════════════════════════════════════════════════════════ */
 .skeleton-bone {
     background: linear-gradient(90deg,
-            rgba(23, 25, 30, 0.05) 25%,
-            rgba(23, 25, 30, 0.10) 37%,
-            rgba(23, 25, 30, 0.05) 63%);
+            var(--skeleton-a) 25%,
+            var(--skeleton-b) 37%,
+            var(--skeleton-a) 63%);
     background-size: 400% 100%;
     animation: skeleton-shimmer 1.4s ease infinite;
     border-radius: 8px;

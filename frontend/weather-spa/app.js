@@ -31,6 +31,7 @@ class WeatherApp {
     #pendingChartData = null;
     #audioCtx = null;
     #dynamicDeals = null;
+    #searchAbort = null;
 
     constructor() {
         // prefers-reduced-motion: acelerar todos los tweens de GSAP hasta
@@ -141,6 +142,12 @@ class WeatherApp {
                 this.#ui.showToast('Plan Corporativo seleccionado. Un Concierge VIP se pondrá en contacto en breve.', 'info');
             }
         });
+
+        // Si el esquema del SO cambia, re-resolver la variante de acento AA
+        window.matchMedia?.('(prefers-color-scheme: dark)')
+            .addEventListener?.('change', () => {
+                this.#applyWeatherTheme(this.#currentWeatherRaw || 'pcloudy');
+            });
 
         // Mesh gradient parallax on mouse (omitido con movimiento reducido)
         if (!REDUCED_MOTION) {
@@ -300,7 +307,9 @@ class WeatherApp {
         const city = APP_CONFIG.CITIES.find(c => c.name === this.#currentCityName) || APP_CONFIG.CITIES[0];
 
         this.#map = L.map('map', { zoomControl: false }).setView([city.coords.lat, city.coords.lon], 12);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        const darkTiles = window.matchMedia
+            && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        L.tileLayer(`https://{s}.basemaps.cartocdn.com/${darkTiles ? 'dark_all' : 'light_all'}/{z}/{x}/{y}{r}.png`, {
             attribution: '&copy; OpenStreetMap &copy; CARTO',
             subdomains: 'abcd',
             maxZoom: 19
@@ -416,7 +425,67 @@ class WeatherApp {
         const dropdown = document.getElementById('city-dropdown');
         const trigger = document.getElementById('city-trigger');
 
-        dropdown.innerHTML = APP_CONFIG.CITIES.map((city, index) => `
+        dropdown.innerHTML = `
+            <div class="city-search-box">
+                <input id="city-search" class="city-search-input" type="text"
+                       placeholder="Buscar cualquier ciudad del mundo..."
+                       autocomplete="off" role="searchbox" aria-label="Buscar ciudad" />
+            </div>
+            <div id="city-options"></div>
+        `;
+        this.#renderCityOptions();
+
+        // Event Delegation: items estáticos (data-value) y resultados
+        // del buscador (data-lat/lon) comparten el mismo camino.
+        dropdown.addEventListener('click', (e) => {
+            const item = e.target.closest('.dropdown-item');
+            if (!item) return;
+
+            e.stopPropagation();
+            if (item.dataset.value !== undefined) {
+                this.handleCityChange(parseInt(item.dataset.value));
+            } else if (item.dataset.lat !== undefined) {
+                this.#selectDynamicCity({
+                    name: item.dataset.name,
+                    country: item.dataset.country,
+                    coords: { lat: parseFloat(item.dataset.lat), lon: parseFloat(item.dataset.lon) },
+                    timezone: item.dataset.tz || 'UTC'
+                });
+            }
+            this.toggleDropdown(false);
+        });
+
+        // Buscador global de ciudades (Open-Meteo Geocoding, debounce 300ms)
+        const searchInput = dropdown.querySelector('#city-search');
+        searchInput.addEventListener('click', (e) => e.stopPropagation());
+        let debounceId = null;
+        searchInput.addEventListener('input', () => {
+            clearTimeout(debounceId);
+            const q = searchInput.value.trim();
+            if (q.length < 2) {
+                this.#highlightedIndex = -1;
+                this.#renderCityOptions();
+                return;
+            }
+            debounceId = setTimeout(() => this.#searchCities(q), 300);
+        });
+        searchInput.addEventListener('keydown', (e) => this.#handleListKeydown(e));
+
+        // Dropdown Trigger Click
+        trigger.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.preloadAllBackgrounds();
+            const isOpen = dropdown.classList.contains('open');
+            this.toggleDropdown(!isOpen);
+        });
+    }
+
+    /** Lista estática de destinos destacados (Config.CITIES). */
+    #renderCityOptions() {
+        const options = document.getElementById('city-options');
+        if (!options) return;
+        options.innerHTML = APP_CONFIG.CITIES.map((city, index) => `
             <div class="dropdown-item p-4 flex items-center justify-between cursor-pointer border-b border-hairline last:border-none group focus:outline-none"
                  role="option" id="city-option-${index}" tabindex="-1" data-value="${index}" aria-selected="false">
                 <div class="flex items-center gap-3">
@@ -429,26 +498,69 @@ class WeatherApp {
                 <i class="fas fa-chevron-right text-ink-faint opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all"></i>
             </div>
         `).join('');
+    }
 
-        // Event Delegation for items
-        dropdown.addEventListener('click', (e) => {
-            const item = e.target.closest('.dropdown-item');
-            if (!item) return;
+    /** Busca ciudades arbitrarias vía Open-Meteo Geocoding. */
+    async #searchCities(query) {
+        const options = document.getElementById('city-options');
+        if (!options) return;
+        options.innerHTML = `<div class="search-hint">Buscando "${sanitize(query)}"…</div>`;
 
-            e.stopPropagation();
-            const index = parseInt(item.dataset.value);
-            this.handleCityChange(index);
-            this.toggleDropdown(false);
-        });
+        try {
+            if (this.#searchAbort) this.#searchAbort.abort();
+            this.#searchAbort = new AbortController();
 
-        // Dropdown Trigger Click
-        trigger.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            this.preloadAllBackgrounds();
-            const isOpen = dropdown.classList.contains('open');
-            this.toggleDropdown(!isOpen);
-        });
+            const url = `${APP_CONFIG.API.GEOCODING_BASE_URL}?name=${encodeURIComponent(query)}&count=6&language=es&format=json`;
+            const res = await fetch(url, { signal: this.#searchAbort.signal });
+            if (!res.ok) throw new Error(`Geocoding HTTP ${res.status}`);
+
+            const json = await res.json();
+            const results = json.results || [];
+            this.#highlightedIndex = -1;
+
+            if (results.length === 0) {
+                options.innerHTML = `<div class="search-hint">Sin resultados para "${sanitize(query)}"</div>`;
+                return;
+            }
+
+            options.innerHTML = results.map((r, i) => `
+                <div class="dropdown-item p-4 flex items-center justify-between cursor-pointer border-b border-hairline last:border-none group focus:outline-none"
+                     role="option" id="city-result-${i}" tabindex="-1" aria-selected="false"
+                     data-lat="${Number(r.latitude)}" data-lon="${Number(r.longitude)}"
+                     data-name="${sanitize(r.name)}" data-country="${sanitize(r.country || '')}"
+                     data-tz="${sanitize(r.timezone || 'UTC')}">
+                    <div class="flex flex-col">
+                        <span class="city-name font-serif text-lg text-ink group-hover:text-accent transition-colors">${sanitize(r.name)}</span>
+                        <span class="text-[10px] text-ink-faint uppercase tracking-widest">${sanitize([r.admin1, r.country].filter(Boolean).join(' · '))}</span>
+                    </div>
+                    <i class="fas fa-location-arrow text-ink-faint opacity-0 group-hover:opacity-100 transition-all"></i>
+                </div>
+            `).join('');
+        } catch (err) {
+            if (err.name === 'AbortError') return;
+            options.innerHTML = `<div class="search-hint">No se pudo buscar. Comprueba tu conexión.</div>`;
+        }
+    }
+
+    /** Carga el pronóstico de una ciudad arbitraria (buscador). */
+    async #selectDynamicCity(city) {
+        if (this.#abortController) this.#abortController.abort();
+        this.#abortController = new AbortController();
+        const signal = this.#abortController.signal;
+
+        this.#currentCityName = city.name;
+        this.#toggleCapitalBadge(false);
+        this.offerContainer.classList.add('hidden');
+
+        const triggerText = document.getElementById('trigger-text');
+        if (triggerText) triggerText.textContent = city.country ? `${city.name}, ${city.country}` : city.name;
+        document.querySelectorAll('.dropdown-item').forEach(el => el.classList.remove('selected'));
+
+        this.#playHapticClick();
+        this.#hero.updateCity(city.name);
+        this.updateExperience(city.name);
+
+        await this.loadCityWeather(city, false, true, true, signal);
     }
 
     #initAccessibility() {
@@ -457,23 +569,29 @@ class WeatherApp {
 
         trigger.addEventListener('keydown', (e) => {
             const isOpen = dropdown.classList.contains('open');
+            if ((e.key === 'Enter' || e.key === ' ') && !isOpen) {
+                e.preventDefault();
+                this.toggleDropdown(true);
+                return;
+            }
+            this.#handleListKeydown(e);
+        });
 
-            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        // Modal: focus trap — Tab cicla dentro del diálogo (WCAG 2.4.3)
+        this.modal.addEventListener('keydown', (e) => {
+            if (e.key !== 'Tab') return;
+            const focusables = this.modalContent.querySelectorAll(
+                'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+            );
+            if (focusables.length === 0) return;
+            const first = focusables[0];
+            const last = focusables[focusables.length - 1];
+            if (e.shiftKey && document.activeElement === first) {
                 e.preventDefault();
-                if (!isOpen) this.toggleDropdown(true);
-                this.#navigateDropdown(e.key === 'ArrowDown' ? 1 : -1);
-            }
-            else if (e.key === 'Enter' || e.key === ' ') {
+                last.focus();
+            } else if (!e.shiftKey && document.activeElement === last) {
                 e.preventDefault();
-                if (!isOpen) {
-                    this.toggleDropdown(true);
-                } else if (this.#highlightedIndex !== -1) {
-                    this.handleCityChange(this.#highlightedIndex);
-                    this.toggleDropdown(false);
-                }
-            }
-            else if (e.key === 'Escape') {
-                this.toggleDropdown(false);
+                first.focus();
             }
         });
 
@@ -485,30 +603,51 @@ class WeatherApp {
         });
     }
 
-    #navigateDropdown(step) {
-        const items = document.querySelectorAll('.dropdown-item');
+    /**
+     * Navegación de teclado compartida por el trigger y el buscador:
+     * flechas, Home/End, Enter (selecciona el resaltado) y Escape.
+     */
+    #handleListKeydown(e) {
+        const dropdown = document.getElementById('city-dropdown');
+        const isOpen = dropdown.classList.contains('open');
+        const items = dropdown.querySelectorAll('.dropdown-item');
+
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (!isOpen) this.toggleDropdown(true);
+            this.#highlightIndex(this.#highlightedIndex + (e.key === 'ArrowDown' ? 1 : -1));
+        } else if (e.key === 'Home' && isOpen && items.length) {
+            e.preventDefault();
+            this.#highlightIndex(0);
+        } else if (e.key === 'End' && isOpen && items.length) {
+            e.preventDefault();
+            this.#highlightIndex(items.length - 1);
+        } else if (e.key === 'Enter') {
+            if (isOpen && this.#highlightedIndex !== -1 && items[this.#highlightedIndex]) {
+                e.preventDefault();
+                items[this.#highlightedIndex].click();
+            }
+        } else if (e.key === 'Escape') {
+            this.toggleDropdown(false);
+        }
+    }
+
+    /** Resalta el item idx (con wrap-around) y sincroniza aria. */
+    #highlightIndex(idx) {
+        const items = document.getElementById('city-dropdown').querySelectorAll('.dropdown-item');
         if (items.length === 0) return;
 
-        // Remove old highlight
-        if (this.#highlightedIndex !== -1) {
+        if (this.#highlightedIndex !== -1 && items[this.#highlightedIndex]) {
             items[this.#highlightedIndex].classList.remove('highlighted');
             items[this.#highlightedIndex].ariaSelected = 'false';
         }
 
-        this.#highlightedIndex += step;
-
-        // Loop around
-        if (this.#highlightedIndex >= items.length) this.#highlightedIndex = 0;
-        if (this.#highlightedIndex < 0) this.#highlightedIndex = items.length - 1;
+        this.#highlightedIndex = ((idx % items.length) + items.length) % items.length;
 
         const activeItem = items[this.#highlightedIndex];
         activeItem.classList.add('highlighted');
         activeItem.ariaSelected = 'true';
-
-        // Scroll into view
         activeItem.scrollIntoView({ block: 'nearest' });
-
-        // Update aria-activedescendant
         document.getElementById('city-trigger').setAttribute('aria-activedescendant', activeItem.id);
     }
 
@@ -521,11 +660,21 @@ class WeatherApp {
             dropdown.classList.add('open');
             icon.style.transform = 'rotate(180deg)';
             trigger.setAttribute('aria-expanded', 'true');
+            // Foco directo al buscador para escribir sin click extra
+            dropdown.querySelector('#city-search')?.focus();
         } else {
             dropdown.classList.remove('open');
             icon.style.transform = 'rotate(0deg)';
             trigger.setAttribute('aria-expanded', 'false');
+            trigger.removeAttribute('aria-activedescendant');
             this.#highlightedIndex = -1;
+
+            // Reset del buscador: volver a la lista de destinos destacados
+            const searchInput = dropdown.querySelector('#city-search');
+            if (searchInput && searchInput.value) {
+                searchInput.value = '';
+                this.#renderCityOptions();
+            }
 
             // Clean up highlights
             document.querySelectorAll('.dropdown-item').forEach(i => {
@@ -589,7 +738,10 @@ class WeatherApp {
     }
 
     updateExperience(cityName) {
-        const data = this.#experience.getExperience(cityName);
+        // Ciudades sin experiencia curada (buscador/geolocalización) usan
+        // la imagen neutral de la Tierra
+        const data = this.#experience.getExperience(cityName)
+            || this.#experience.getExperience('Tu Ubicación');
         if (data) {
             this.#hero.setBackground(data.img, data.blur);
             this.#experience.updateAudio(cityName);
@@ -676,6 +828,10 @@ class WeatherApp {
 
             this.#renderForecast(validatedForecasts);
 
+            // Anunciar la actualización a lectores de pantalla (aria-live)
+            const srStatus = document.getElementById('sr-status');
+            if (srStatus) srStatus.textContent = `Mostrando pronóstico de ${this.#currentCityName}`;
+
             // B2: refrescar marcador/popup del mapa AHORA que los datos
             // reales existen (el updateMap inicial usó los del render previo)
             this.#renderMarker(city.coords.lat, city.coords.lon);
@@ -716,11 +872,29 @@ class WeatherApp {
         }
     }
 
-    async #fetchWithRetry(coords, attempt = 1, signal = null) {
+    /**
+     * Cadena de datos: Open-Meteo como PRIMARIO (rápido, fiable, con
+     * probabilidad de precipitación y viento reales) y 7Timer como
+     * fallback con reintentos exponenciales.
+     */
+    async #fetchWithRetry(coords, _attempt = 1, signal = null) {
+        try {
+            return await this.#fetchOpenMeteo(coords, signal);
+        } catch (error) {
+            if (error.name === 'AbortError') throw error;
+            // Sin red (503 del SW / navigator.onLine=false): el fallback
+            // también fallaría — directo a IndexedDB.
+            if (error.offline) throw error;
+
+            console.warn('Open-Meteo no disponible, usando 7Timer...', error.message);
+            return this.#fetchSevenTimer(coords, 1, signal);
+        }
+    }
+
+    async #fetchSevenTimer(coords, attempt = 1, signal = null) {
         try {
             return await this.#fetchWeatherData(coords, signal);
         } catch (error) {
-            // Don't retry aborted requests or non-retryable errors (4xx)
             if (error.name === 'AbortError') throw error;
             if (error.retryable === false) throw error;
 
@@ -728,10 +902,10 @@ class WeatherApp {
                 const delay = APP_CONFIG.API.RETRY_DELAY_MS * Math.pow(2, attempt - 1);
                 console.warn(`Retry attempt ${attempt} of ${APP_CONFIG.API.RETRY_ATTEMPTS}...`);
                 await new Promise(r => setTimeout(r, delay));
-                return this.#fetchWithRetry(coords, attempt + 1, signal);
+                return this.#fetchSevenTimer(coords, attempt + 1, signal);
             }
 
-            return await this.#fetchOpenMeteo(coords, signal);
+            throw error;
         }
     }
 
@@ -739,14 +913,14 @@ class WeatherApp {
         const safeLat = parseFloat(lat).toFixed(4);
         const safeLon = parseFloat(lon).toFixed(4);
 
-        console.warn('⚠️ Initiating Open-Meteo Fallback API...');
-
-        const url = `${APP_CONFIG.API.OPENMETEO_BASE_URL}?latitude=${safeLat}&longitude=${safeLon}&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_probability_max&timezone=auto`;
+        const url = `${APP_CONFIG.API.OPENMETEO_BASE_URL}?latitude=${safeLat}&longitude=${safeLon}&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_probability_max,windspeed_10m_max&timezone=auto&forecast_days=7`;
         const response = await fetch(url, signal ? { signal } : undefined);
 
         if (!response.ok) {
-            const error = new Error(`Open-Meteo Fallback failed: HTTP ${response.status}`);
+            const error = new Error(`Open-Meteo failed: HTTP ${response.status}`);
             error.retryable = false;
+            error.offline = response.headers.get('X-SW-Offline') === 'true'
+                || navigator.onLine === false;
             throw error;
         }
 
@@ -759,6 +933,7 @@ class WeatherApp {
                 const min = json.daily.temperature_2m_min[i];
                 const code = json.daily.weathercode[i];
                 const rainProb = json.daily.precipitation_probability_max?.[i];
+                const windMax = json.daily.windspeed_10m_max?.[i];
 
                 let weather = 'clear';
                 if (code >= 1 && code <= 2) weather = 'pcloudy';
@@ -774,8 +949,9 @@ class WeatherApp {
                 if (offsetHours < 0) offsetHours = 0;
 
                 const rain_prob = typeof rainProb === 'number' ? rainProb : undefined;
-                dataseries.push({ timepoint: offsetHours, temp2m: max, weather, rain_prob });
-                dataseries.push({ timepoint: offsetHours + 6, temp2m: min, weather, rain_prob });
+                const wind_max = typeof windMax === 'number' ? windMax : undefined;
+                dataseries.push({ timepoint: offsetHours, temp2m: max, weather, rain_prob, wind_max });
+                dataseries.push({ timepoint: offsetHours + 6, temp2m: min, weather, rain_prob, wind_max });
             });
         }
         return { dataseries };
@@ -868,6 +1044,11 @@ class WeatherApp {
                                 <span class="block text-[10px] uppercase tracking-[0.15em] mb-1 font-semibold text-ink-soft">Prob. Precip.</span>
                                 <span class="text-2xl text-ink font-serif">${Number.isFinite(today.rainChance) ? today.rainChance : 0}%</span>
                             </div>
+                            ${Number.isFinite(today.windMax) ? `
+                            <div>
+                                <span class="block text-[10px] uppercase tracking-[0.15em] mb-1 font-semibold text-ink-soft">Viento</span>
+                                <span class="text-2xl text-ink font-serif">${Math.round(today.windMax)}<span class="text-sm text-ink-soft"> km/h</span></span>
+                            </div>` : ''}
                         </div>
                     </div>
 
@@ -976,9 +1157,13 @@ class WeatherApp {
     #applyWeatherTheme(weather) {
         const theme = APP_CONFIG.WEATHER_THEMES[weather] || APP_CONFIG.WEATHER_THEMES['pcloudy'];
         const root = document.documentElement.style;
+        const dark = window.matchMedia
+            && window.matchMedia('(prefers-color-scheme: dark)').matches;
 
         root.setProperty('--brand-accent', theme.accent);
-        root.setProperty('--brand-accent-text', theme.text || theme.accent);
+        // Variante AA para texto pequeño: oscurecida en claro, aclarada en oscuro
+        root.setProperty('--brand-accent-text',
+            dark ? (theme.textDark || theme.accent) : (theme.text || theme.accent));
         root.setProperty('--brand-accent-hover', theme.hover);
         root.setProperty('--brand-dim', theme.dim);
         root.setProperty('--brand-glow', theme.glow);

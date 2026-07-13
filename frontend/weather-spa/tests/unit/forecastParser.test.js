@@ -102,6 +102,25 @@ test('sin init (fallback Open-Meteo) no explota y agrupa igual', () => {
     assert.ok(out.length >= 1);
 });
 
+test('viento: wind_max de Open-Meteo pasa directo (máximo del día)', () => {
+    const data = makeSeries({ days: 1 });
+    data.dataseries.forEach((p, i) => { p.wind_max = 10 + i; });
+    const out = processForecastData(data, MADRID);
+    assert.equal(out[0].windMax, 17);
+});
+
+test('viento: categoría 1-8 de 7Timer se aproxima a km/h', () => {
+    const data = makeSeries({ days: 1 });
+    data.dataseries.forEach(p => { p.wind10m = { direction: 'N', speed: 3 }; });
+    const out = processForecastData(data, MADRID);
+    assert.equal(out[0].windMax, 21); // categoría 3 ≈ 21 km/h
+});
+
+test('viento: sin datos → windMax null (la stat no se muestra)', () => {
+    const out = processForecastData(makeSeries({ days: 1 }), MADRID);
+    assert.equal(out[0].windMax, null);
+});
+
 test('validateForecastData repara NaN con valores neutros', () => {
     const out = validateForecastData([{ max: NaN, min: NaN }]);
     assert.equal(out[0].max, 20);

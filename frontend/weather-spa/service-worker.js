@@ -23,7 +23,7 @@
  * ╚═══════════════════════════════════════════════════════════════╝
  */
 
-const CACHE_VERSION = 'nextgen-v8';
+const CACHE_VERSION = 'nextgen-v9';
 const OFFLINE_PAGE = './offline.html';
 
 // ─────────────────────────────────────────────────────────────────
@@ -81,7 +81,8 @@ const CDN_PATTERNS = [
 // API PATTERNS → Network First (datos frescos cuando es posible)
 // ─────────────────────────────────────────────────────────────────
 const API_PATTERNS = [
-    '7timer.info'
+    '7timer.info',
+    'open-meteo.com'   // forecast (primario) + geocoding del buscador
 ];
 
 // ─────────────────────────────────────────────────────────────────

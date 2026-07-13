@@ -135,6 +135,62 @@ test('NextGen Europa — flujo completo en navegador', { timeout: 180000 }, asyn
             assert.equal(await page.getAttribute('#city-trigger', 'aria-expanded'), 'false');
         });
 
+        await t.test('viento: la stat aparece con el dato de la API primaria', async () => {
+            const wind = await page.evaluate(() => {
+                const spans = [...document.querySelectorAll('#bento-main span')];
+                const label = spans.find(s => s.textContent.trim() === 'Viento');
+                return label ? label.nextElementSibling?.textContent.trim() : null;
+            });
+            assert.ok(wind && /\d+\s*km\/h/.test(wind), `stat de viento presente (${wind})`);
+        });
+
+        await t.test('buscador: encontrar y seleccionar una ciudad arbitraria', async () => {
+            await page.evaluate(() => window.scrollTo(0, 0));
+            await page.click('#city-trigger');
+            await page.waitForTimeout(400);
+            await page.fill('#city-search', 'atenas');
+            await page.waitForTimeout(800); // debounce + fetch stubbeado
+
+            const resultCount = await page.evaluate(() =>
+                document.querySelectorAll('#city-options .dropdown-item[data-lat]').length);
+            assert.equal(resultCount, 1, 'un resultado de geocoding');
+
+            await page.click('#city-options .dropdown-item[data-lat]');
+            await page.waitForTimeout(3500);
+
+            const s = await snapshot(page);
+            assert.equal(s.titleCity, 'Atenas');
+            assert.equal(s.triggerText, 'Atenas, Grecia');
+            assert.equal(Number(s.bentoTemp), baseTempForLat(37.98), 'datos del stub para Atenas');
+            assert.ok(s.offerHidden, 'sin oferta para ciudad arbitraria');
+        });
+
+        await t.test('fallback: si Open-Meteo falla, 7Timer responde', async () => {
+            api.failOpenMeteo = true;
+            await selectCity(page, 5); // Barcelona
+            await page.waitForTimeout(4000);
+            api.failOpenMeteo = false;
+
+            const s = await snapshot(page);
+            assert.equal(s.titleCity, 'Barcelona');
+            assert.equal(Number(s.bentoTemp), baseTempForLat(41.3851), 'datos del stub de 7Timer');
+            assert.ok(s.errorHidden, 'sin estado de error');
+        });
+
+        await t.test('modo oscuro: tokens y acento de texto se adaptan', async () => {
+            await page.emulateMedia({ colorScheme: 'dark' });
+            await selectCity(page, 0); // re-render con esquema oscuro (Madrid, clearday)
+            await page.waitForTimeout(3500);
+
+            const dark = await page.evaluate(() => ({
+                bodyBg: getComputedStyle(document.body).backgroundColor,
+                accentText: getComputedStyle(document.documentElement).getPropertyValue('--brand-accent-text').trim()
+            }));
+            assert.equal(dark.bodyBg, 'rgb(17, 19, 24)', 'fondo papel oscuro');
+            assert.equal(dark.accentText.toUpperCase(), '#D27306', 'variante textDark del tema despejado');
+            await page.emulateMedia({ colorScheme: 'light' });
+        });
+
         await t.test('sin errores de página en todo el flujo', async () => {
             assert.deepEqual(app.pageErrors, [], 'cero pageerror');
         });
