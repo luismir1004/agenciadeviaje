@@ -49,7 +49,6 @@ const COPY_FILES = [
     'icons/icon-512x512-maskable.png',
     'icons/apple-touch-icon.png',
     'tailwind-dist.css',
-    'data/deals.json',
     'robots.txt',
     'og-image.png'
 ];
@@ -88,7 +87,6 @@ if (fs.existsSync(DIST)) {
 ensureDir(DIST);
 ensureDir(path.join(DIST, 'services'));
 ensureDir(path.join(DIST, 'icons'));
-ensureDir(path.join(DIST, 'data'));
 
 let totalOriginal = 0;
 let totalMinified = 0;

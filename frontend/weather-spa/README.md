@@ -80,8 +80,8 @@ La aplicación sigue un principio estricto de **Separación de Responsabilidades
    ┌──────▼──────┐  ┌─────▼──────┐  ┌──────▼──────┐
    │ HeroManager │  │ChartManager│  │ Experience  │
    │ Animaciones │  │ Chart Pro  │  │  Manager    │
-   │ GSAP + Pool │  │ Tooltips + │  │ Audio +     │
-   │             │  │ Anotaciones│  │ Backgrounds │
+   │ GSAP + Pool │  │ Tooltips + │  │ Backgrounds │
+   │             │  │ Anotaciones│  │  Unsplash   │
    └─────────────┘  └────────────┘  └─────────────┘
           │                │                │
    ┌──────▼──────┐  ┌─────▼──────┐  ┌──────▼──────┐
@@ -321,9 +321,6 @@ weather-spa/
 ├── offline.html            # Fallback offline 100% autocontenido
 ├── package.json            # Vite dev server + scripts de build
 │
-├── data/
-│   └── deals.json          # Ofertas dinámicas por ciudad
-│
 ├── icons/
 │   ├── icon-192x192.svg / .png       # PWA icon (compass rose)
 │   ├── icon-512x512.svg / .png       # PWA icon (detailed)
@@ -335,7 +332,7 @@ weather-spa/
     ├── CacheManager.js      # LocalStorage con TTL + sesión
     ├── ChartManager.js      # Chart Pro (tooltips + anotaciones)
     ├── HeroManager.js       # Animaciones GSAP + Image Pool
-    ├── ExperienceManager.js # Audio ambiental + backgrounds
+    ├── ExperienceManager.js # Backgrounds inmersivos (Unsplash)
     ├── UIManager.js         # Toasts + feedback visual
     └── ItineraryService.js  # Generador de itinerarios por clima
 ```

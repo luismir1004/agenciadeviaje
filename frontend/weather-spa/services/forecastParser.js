@@ -41,18 +41,20 @@ export function processForecastData(data, city) {
         base = new Date(Date.UTC(+initMatch[1], +initMatch[2] - 1, +initMatch[3], +initMatch[4]));
     }
 
+    // Formatters inmutables por timezone: construirlos UNA vez, no por punto
+    // (56 puntos × 3 instancias por parseo si vivieran dentro del closure)
+    const formatterDate = new Intl.DateTimeFormat('es-ES', {
+        timeZone: tz, day: 'numeric', month: 'short'
+    });
+    const formatterDay = new Intl.DateTimeFormat('es-ES', {
+        timeZone: tz, weekday: 'long'
+    });
+    const formatterKey = new Intl.DateTimeFormat('en-CA', {
+        timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit'
+    }); // en-CA gives YYYY-MM-DD
+
     const getDateFromOffset = (offsetHours) => {
         const date = new Date(base.getTime() + offsetHours * 60 * 60 * 1000);
-
-        const formatterDate = new Intl.DateTimeFormat('es-ES', {
-            timeZone: tz, day: 'numeric', month: 'short'
-        });
-        const formatterDay = new Intl.DateTimeFormat('es-ES', {
-            timeZone: tz, weekday: 'long'
-        });
-        const formatterKey = new Intl.DateTimeFormat('en-CA', {
-            timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit'
-        }); // en-CA gives YYYY-MM-DD
 
         return {
             key: formatterKey.format(date),
