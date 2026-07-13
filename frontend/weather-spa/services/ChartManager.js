@@ -1,12 +1,16 @@
+import { REDUCED_MOTION } from './Config.js';
+
 /**
- * ChartManager Pro — Dark Glass Edition
- * Chart.js wrapper with dark theme, animated line draw,
- * custom dark tooltips, and gradient pulse.
+ * ChartManager Pro — Meridian Editorial Edition
+ * Chart.js wrapper con paleta clara (papel/tinta), línea animada,
+ * tooltips custom y anotaciones min/max con acento dinámico.
  */
-class ChartManager {
+export class ChartManager {
     #ctx;
     #chartInstance = null;
     #currentForecasts = [];
+    #badgeBg = 'rgba(255, 255, 255, 0.96)';
+    #badgeBorder = 'rgba(23, 25, 30, 0.12)';
 
     constructor(canvasId) {
         const canvas = document.getElementById(canvasId);
@@ -23,11 +27,6 @@ class ChartManager {
         const labels = dailyForecasts.map(d => d.dayName.substring(0, 3));
         const maxTemps = dailyForecasts.map(d => d.max);
         const minTemps = dailyForecasts.map(d => d.min);
-        const weatherMeta = dailyForecasts.map(d => ({
-            icon: d.icon || 'fa-sun',
-            desc: d.desc || 'Despejado',
-            weather: d.weather || 'clear'
-        }));
 
         if (this.#chartInstance) {
             this.#chartInstance.destroy();
@@ -39,9 +38,22 @@ class ChartManager {
         const maxIdx = maxTemps.indexOf(globalMax);
         const minIdx = minTemps.indexOf(globalMin);
 
-        // Get theme-aware accent color
-        const themeAccent = getComputedStyle(document.documentElement)
-            .getPropertyValue('--brand-accent').trim() || '#3B82F6';
+        // Colores derivados de los tokens del design system — así el chart
+        // respeta automáticamente el modo claro/oscuro y el tema por clima
+        const rootStyles = getComputedStyle(document.documentElement);
+        const themeAccent = rootStyles.getPropertyValue('--brand-accent').trim() || '#2563EB';
+        const inkToken = rootStyles.getPropertyValue('--ink').trim() || '#17191E';
+        const inkSoftToken = rootStyles.getPropertyValue('--ink-soft').trim() || '#565B64';
+        const surfaceToken = rootStyles.getPropertyValue('--surface').trim() || '#FFFFFF';
+
+        const tickColor = this.#hexToRgba(inkSoftToken, 0.85);
+        const gridColor = this.#hexToRgba(inkToken, 0.08);
+        const mutedLine = this.#hexToRgba(inkToken, 0.25);
+        const mutedPoint = this.#hexToRgba(inkToken, 0.15);
+        const mutedPointBorder = this.#hexToRgba(inkToken, 0.30);
+        const minAccent = this.#hexToRgba(inkSoftToken, 0.9);
+        this.#badgeBg = this.#hexToRgba(surfaceToken, 0.96);
+        this.#badgeBorder = this.#hexToRgba(inkToken, 0.12);
 
         // Dark gradient fill (blue glow)
         const gradientMax = this.#ctx.createLinearGradient(0, 0, 0, 300);
@@ -64,20 +76,26 @@ class ChartManager {
 
                 if (metaMin.data[minIdx]) {
                     const ptMin = metaMin.data[minIdx];
-                    this.#drawAnnotation(ctx, ptMin.x, ptMin.y, `${globalMin}°`, 'rgba(148,163,184,0.8)', '▼', 22);
+                    this.#drawAnnotation(ctx, ptMin.x, ptMin.y, `${globalMin}°`, minAccent, '▼', 22);
                 }
             }
         };
+
+        const reducedMotion = REDUCED_MOTION;
 
         // Animated line draw plugin
         const lineDrawPlugin = {
             id: 'lineDrawAnimation',
             afterInit: (chart) => {
-                chart._drawProgress = 0;
+                // Con movimiento reducido, la línea aparece completa
+                chart._drawProgress = reducedMotion ? 1 : 0;
+                if (reducedMotion) return;
                 const animate = () => {
                     if (chart._drawProgress < 1) {
                         chart._drawProgress += 0.02;
-                        chart.update('none');
+                        // draw() re-pinta sin recalcular layout/escalas
+                        // (update('none') era mucho más costoso por frame)
+                        chart.draw();
                         requestAnimationFrame(animate);
                     }
                 };
@@ -118,10 +136,10 @@ class ChartManager {
                         tension: 0.45,
                         fill: true,
                         pointBackgroundColor: maxTemps.map((_, i) =>
-                            i === maxIdx ? themeAccent : 'rgba(255,255,255,0.15)'
+                            i === maxIdx ? themeAccent : mutedPoint
                         ),
                         pointBorderColor: maxTemps.map((_, i) =>
-                            i === maxIdx ? themeAccent : 'rgba(255,255,255,0.3)'
+                            i === maxIdx ? themeAccent : mutedPointBorder
                         ),
                         pointRadius: maxTemps.map((_, i) =>
                             i === maxIdx ? 6 : 3
@@ -134,15 +152,15 @@ class ChartManager {
                     {
                         label: 'Mínima',
                         data: minTemps,
-                        borderColor: 'rgba(255, 255, 255, 0.15)',
+                        borderColor: mutedLine,
                         borderWidth: 1.5,
                         borderDash: [5, 5],
                         tension: 0.45,
                         fill: false,
                         pointBackgroundColor: minTemps.map((_, i) =>
-                            i === minIdx ? 'rgba(148,163,184,0.8)' : 'rgba(255,255,255,0.1)'
+                            i === minIdx ? minAccent : mutedPoint
                         ),
-                        pointBorderColor: 'rgba(255,255,255,0.2)',
+                        pointBorderColor: mutedPointBorder,
                         pointRadius: minTemps.map((_, i) =>
                             i === minIdx ? 6 : 2
                         ),
@@ -159,13 +177,13 @@ class ChartManager {
                     padding: { top: 55 }
                 },
                 animation: {
-                    duration: 1500,
+                    duration: reducedMotion ? 0 : 1500,
                     easing: 'easeOutQuart'
                 },
                 plugins: {
                     legend: {
                         labels: {
-                            color: 'rgba(255, 255, 255, 0.4)',
+                            color: tickColor,
                             font: { family: 'Inter', size: 10, weight: 500 },
                             usePointStyle: true,
                             boxWidth: 5,
@@ -182,15 +200,15 @@ class ChartManager {
                     x: {
                         grid: { display: false },
                         ticks: {
-                            color: 'rgba(255, 255, 255, 0.3)',
+                            color: tickColor,
                             font: { family: 'Inter', size: 10, weight: 500 }
                         },
                         border: { display: false }
                     },
                     y: {
-                        grid: { color: 'rgba(255, 255, 255, 0.04)' },
+                        grid: { color: gridColor },
                         ticks: {
-                            color: 'rgba(255, 255, 255, 0.3)',
+                            color: tickColor,
                             font: { family: 'Inter', size: 10 },
                             callback: (val) => `${val}°`
                         },
@@ -228,12 +246,12 @@ class ChartManager {
         const w = metrics.width + padX * 2;
         const h = 16;
 
-        // Dark glass badge background
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+        // Fondo del badge según tokens (claro/oscuro)
+        ctx.fillStyle = this.#badgeBg;
         ctx.beginPath();
         ctx.roundRect(x - w / 2, badgeY - h / 2 - padY, w, h + padY, 6);
         ctx.fill();
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.strokeStyle = this.#badgeBorder;
         ctx.lineWidth = 1;
         ctx.stroke();
 
@@ -283,20 +301,20 @@ class ChartManager {
 
             tooltipEl.innerHTML = `
                 <div class="flex items-center gap-2 mb-1.5">
-                    <i class="fas ${dayFn.icon} text-blue-400"></i>
-                    <span class="text-white font-bold font-sans tracking-wide capitalize">${dayFn.dayName.split(' ')[0]}</span>
+                    <i class="fas ${dayFn.icon} text-accent"></i>
+                    <span class="text-ink font-bold font-sans tracking-wide capitalize">${dayFn.dayName.split(' ')[0]}</span>
                 </div>
-                <div class="text-[11px] text-white/50 mb-3 capitalize tracking-widest">${dayFn.desc}</div>
+                <div class="text-[11px] text-ink-soft mb-3 capitalize tracking-widest">${dayFn.desc}</div>
                 <div class="flex flex-col gap-1.5 text-sm font-sans w-full">
-                    <div class="flex justify-between items-center text-white/90">
-                        <span class="text-xs text-white/50">🔺 Máxima</span>
+                    <div class="flex justify-between items-center text-ink">
+                        <span class="text-xs text-ink-soft">🔺 Máxima</span>
                         <span class="font-bold">${dayFn.max}°</span>
                     </div>
-                    <div class="flex justify-between items-center text-white/60">
-                        <span class="text-xs text-white/40">🔻 Mínima</span>
+                    <div class="flex justify-between items-center text-ink-soft">
+                        <span class="text-xs text-ink-faint">🔻 Mínima</span>
                         <span>${dayFn.min}°</span>
                     </div>
-                    <div class="flex justify-between items-center text-blue-400 mt-2 pt-2 border-t border-white/10 text-[10px] uppercase font-bold tracking-widest">
+                    <div class="flex justify-between items-center text-accent-strong mt-2 pt-2 border-t border-hairline text-[10px] uppercase font-bold tracking-widest">
                         <span>Amplitud</span>
                         <span>${dayFn.max - dayFn.min}°</span>
                     </div>

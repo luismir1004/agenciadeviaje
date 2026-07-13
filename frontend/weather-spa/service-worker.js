@@ -1,18 +1,19 @@
 /**
  * ╔═══════════════════════════════════════════════════════════════╗
  * ║  Service Worker — NextGen Europa PWA v3.0                    ║
- * ║  "Executive Swiss" Design System                             ║
+ * ║  "Meridian Editorial" Design System                          ║
  * ╠═══════════════════════════════════════════════════════════════╣
  * ║                                                               ║
  * ║  Strategy Matrix:                                            ║
  * ║  ┌──────────────────────────┬──────────────────────────────┐ ║
  * ║  │ Resource Type            │ Strategy                     │ ║
  * ║  ├──────────────────────────┼──────────────────────────────┤ ║
- * ║  │ App Shell (HTML, CSS,    │ Cache First →                │ ║
- * ║  │ JS local, Icons)         │ Network Fallback             │ ║
+ * ║  │ Navegaciones (HTML)      │ Network First → Cache        │ ║
  * ║  ├──────────────────────────┼──────────────────────────────┤ ║
- * ║  │ CDN (Fonts, FA, GSAP,    │ Stale-While-Revalidate       │ ║
- * ║  │ Chart.js, Leaflet)       │ (serve cache + bg update)    │ ║
+ * ║  │ App Shell (CSS, JS,      │ Stale-While-Revalidate       │ ║
+ * ║  │ vendor, fonts, icons)    │ (deploys llegan solos)       │ ║
+ * ║  ├──────────────────────────┼──────────────────────────────┤ ║
+ * ║  │ Tiles CARTO              │ Stale-While-Revalidate       │ ║
  * ║  ├──────────────────────────┼──────────────────────────────┤ ║
  * ║  │ API 7Timer               │ Network First →              │ ║
  * ║  │                          │ Cache → Offline JSON         │ ║
@@ -22,7 +23,7 @@
  * ╚═══════════════════════════════════════════════════════════════╝
  */
 
-const CACHE_VERSION = 'nextgen-v4';
+const CACHE_VERSION = 'nextgen-v9';
 const OFFLINE_PAGE = './offline.html';
 
 // ─────────────────────────────────────────────────────────────────
@@ -33,19 +34,39 @@ const APP_SHELL = [
     './index.html',
     './offline.html',
     './styles.css',
+    './styles.css?v=3',      // la página lo pide con query — clave de caché distinta (B9)
     './tailwind-dist.css',
+    './fonts/fraunces-latin-opsz-normal.woff2',
+    './fonts/fraunces-latin-opsz-italic.woff2',
+    './fonts/inter-latin-wght-normal.woff2',
     './app.js',
     './manifest.json',
     './favicon.ico',
+    './data/deals.json',
     './icons/icon-192x192.svg',
     './icons/icon-512x512.svg',
+    './icons/icon-192x192.png',
+    './icons/icon-512x512.png',
+    './icons/icon-512x512-maskable.png',
+    './icons/apple-touch-icon.png',
     './services/Config.js',
     './services/CacheManager.js',
     './services/ChartManager.js',
     './services/UIManager.js',
     './services/HeroManager.js',
     './services/ExperienceManager.js',
-    './services/ItineraryService.js'
+    './services/ItineraryService.js',
+    './services/sanitize.js',
+    './services/forecastParser.js',
+    './vendor/chart.umd.js',
+    './vendor/gsap.min.js',
+    './vendor/localforage.min.js',
+    './vendor/leaflet/leaflet.js',
+    './vendor/leaflet/leaflet.css',
+    './vendor/fontawesome/css/all.min.css',
+    './vendor/fontawesome/webfonts/fa-solid-900.woff2',
+    './vendor/fontawesome/webfonts/fa-brands-400.woff2',
+    './vendor/fontawesome/webfonts/fa-regular-400.woff2'
 ];
 
 // ─────────────────────────────────────────────────────────────────
@@ -53,20 +74,15 @@ const APP_SHELL = [
 // Sirve caché instantáneamente, actualiza en background
 // ─────────────────────────────────────────────────────────────────
 const CDN_PATTERNS = [
-    'cdnjs.cloudflare.com/ajax/libs/font-awesome',
-    'cdnjs.cloudflare.com/ajax/libs/gsap',
-    'cdn.jsdelivr.net/npm/chart.js',
-    'fonts.googleapis.com',
-    'fonts.gstatic.com',
-    'unpkg.com/leaflet',
-    'basemaps.cartocdn.com'   // Leaflet map tiles
+    'basemaps.cartocdn.com'   // Leaflet map tiles (único tercero cacheable)
 ];
 
 // ─────────────────────────────────────────────────────────────────
 // API PATTERNS → Network First (datos frescos cuando es posible)
 // ─────────────────────────────────────────────────────────────────
 const API_PATTERNS = [
-    '7timer.info'
+    '7timer.info',
+    'open-meteo.com'   // forecast (primario) + geocoding del buscador
 ];
 
 // ─────────────────────────────────────────────────────────────────
@@ -83,7 +99,9 @@ const IMAGE_PATTERNS = [
 // ─────────────────────────────────────────────────────────────────
 self.addEventListener('install', (event) => {
     console.log(`[SW] Install — ${CACHE_VERSION}`);
-    self.skipWaiting();
+    // Sin skipWaiting() automático: la versión nueva queda en 'waiting'
+    // y la página muestra un toast "Nueva versión disponible"; al aceptar,
+    // envía SKIP_WAITING (handler en 'message') y recarga.
 
     event.waitUntil(
         caches.open(CACHE_VERSION)
@@ -153,13 +171,22 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // ④ App Shell (mismo origen) → Cache First
-    if (url.origin === self.location.origin) {
-        event.respondWith(cacheFirst(request));
+    // ④ Navegaciones (HTML) → Network First
+    //    El documento siempre intenta llegar fresco; el caché es fallback.
+    if (request.mode === 'navigate') {
+        event.respondWith(networkFirst(request));
         return;
     }
 
-    // ⑤ Default: red directa
+    // ⑤ App Shell (mismo origen) → Stale-While-Revalidate
+    //    Sirve rápido desde caché pero SIEMPRE revalida en background,
+    //    así los despliegues nuevos llegan sin bumpear CACHE_VERSION.
+    if (url.origin === self.location.origin) {
+        event.respondWith(staleWhileRevalidate(request));
+        return;
+    }
+
+    // ⑥ Default: red directa
     event.respondWith(fetch(request).catch(() => offlineFallback(request)));
 });
 
@@ -179,7 +206,7 @@ async function cacheFirst(request) {
             cache.put(request, response.clone());
         }
         return response;
-    } catch (err) {
+    } catch {
         return offlineFallback(request);
     }
 }
@@ -235,7 +262,7 @@ async function networkFirst(request) {
             cache.put(request, response.clone());
         }
         return response;
-    } catch (err) {
+    } catch {
         // Red falló → buscar en caché
         const cached = await cache.match(request);
         if (cached) {
@@ -285,11 +312,11 @@ async function offlineFallback(request) {
                <p style="color:#94a3b8;margin-bottom:1.5rem">
                  No hay conexión a internet.<br>Los datos meteorológicos no están disponibles offline.
                </p>
-               <button onclick="location.reload()" 
-                 style="background:#2563EB;color:#fff;border:none;padding:0.75rem 1.5rem;
-                 border-radius:100px;cursor:pointer;font-size:0.875rem;">
+               <a href="./"
+                 style="display:inline-block;background:#2563EB;color:#fff;text-decoration:none;
+                 padding:0.75rem 1.5rem;border-radius:100px;cursor:pointer;font-size:0.875rem;">
                  Reintentar
-               </button>
+               </a>
              </div></body></html>`,
             { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
         );

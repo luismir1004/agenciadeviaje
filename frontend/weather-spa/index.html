@@ -6,35 +6,57 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NextGen Europa Travel | Forecast</title>
 
+    <!-- Content Security Policy (allowlist de CDNs y APIs usadas) -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self';
+        script-src 'self';
+        style-src 'self' 'unsafe-inline';
+        font-src 'self';
+        img-src 'self' data: blob: https://images.unsplash.com https://plus.unsplash.com https://*.basemaps.cartocdn.com;
+        connect-src 'self' https://www.7timer.info https://api.open-meteo.com https://geocoding-api.open-meteo.com;
+        media-src 'self' https://assets.mixkit.co;
+        worker-src 'self';
+        manifest-src 'self';
+        base-uri 'self';
+        form-action 'self';
+        object-src 'none'">
+
     <!-- Meta Tags SEO -->
-    <meta name="description" content="Experimenta el clima de Europa con lujo. NextGen Europa Travel Agency.">
-    <meta property="og:title" content="NextGen Europa | Pronóstico Exclusivo">
+    <meta name="description" content="Pronóstico meteorológico editorial para viajeros europeos. NextGen Europa Travel Agency.">
+    <meta property="og:title" content="NextGen Europa | Forecast Editorial">
     <meta property="og:description"
-        content="Descubre el clima de las capitales europeas en una experiencia Inmersiva y Ultra-Premium.">
+        content="El clima de las capitales europeas en una experiencia editorial de primera clase.">
+    <meta property="og:type" content="website">
+    <!-- og:image debe ser URL absoluta en producción: prefijar con el dominio final -->
+    <meta property="og:image" content="/og-image.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="NextGen Europa | Forecast Editorial">
+    <meta name="twitter:image" content="/og-image.png">
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="icons/icon-192x192.svg">
-    <link rel="apple-touch-icon" href="icons/icon-192x192.svg">
+    <link rel="icon" type="image/x-icon" href="favicon.ico" sizes="48x48">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 
     <!-- PWA Meta Tags -->
-    <meta name="theme-color" content="#0A0F1E">
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F6F5F1">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#111318">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="NextGen Europa">
 
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500&family=Montserrat:wght@200;300;400;500;600;700&display=swap"
-        rel="stylesheet">
+    <!-- Fonts: Fraunces (display editorial) + Inter (UI) — self-hosted,
+         @font-face en styles.css. Preload de las variantes críticas. -->
+    <link rel="preload" as="font" type="font/woff2" href="fonts/fraunces-latin-opsz-normal.woff2" crossorigin>
+    <link rel="preload" as="font" type="font/woff2" href="fonts/inter-latin-wght-normal.woff2" crossorigin>
+    <link rel="modulepreload" href="services/Config.js">
+    <link rel="modulepreload" href="services/sanitize.js">
+    <link rel="modulepreload" href="services/forecastParser.js">
 
-    <!-- Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Icons (Font Awesome 6.4.0 — self-hosted) -->
+    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css">
 
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <!-- Leaflet CSS 1.9.4 (self-hosted) -->
+    <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
 
     <!-- Tailwind Compiled CSS -->
     <link rel="stylesheet" href="tailwind-dist.css">
@@ -42,165 +64,180 @@
     <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
 
-    <!-- Chart.js CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Preload Critical Asset (imagen HQ del hero inicial: Madrid) -->
+    <link rel="preload" as="image"
+        href="https://images.unsplash.com/photo-1539037116277-4db20889f2d4?q=85&w=1920&auto=format&fit=crop">
 
-    <!-- GSAP CDN -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
-
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- Librerías self-hosted (versiones exactas fijadas en package.json) -->
+    <script src="vendor/chart.umd.js"></script>
+    <script src="vendor/gsap.min.js"></script>
+    <script src="vendor/leaflet/leaflet.js"></script>
 
     <!-- Custom Styles -->
-    <link rel="stylesheet" href="styles.css?v=2">
+    <link rel="stylesheet" href="styles.css?v=3">
 </head>
 
-<body class="bg-midnight text-slate-100 antialiased overflow-x-hidden selection:bg-blue-500/30 selection:text-white">
+<body class="bg-paper text-ink antialiased overflow-x-hidden">
 
-    <!-- Cinematic Grain Overlay (Ultra-Realism) -->
-    <div class="cinematic-overlay"></div>
-
-    <!-- Mesh Gradient Background (Atmospheric) -->
+    <!-- Fondo atmosférico (tinte de acento sutil) -->
     <div id="mesh-bg"></div>
 
-    <!-- Ultra Premium Preloader -->
+    <!-- Preloader Editorial -->
     <div id="luxury-preloader">
         <div class="loader-brand" role="status" aria-label="Cargando aplicación">NextGen Europa</div>
         <div class="loader-brand-spinner"></div>
     </div>
 
-    <!-- Preload Critical Asset -->
-    <link rel="preload" as="image"
-        href="https://images.unsplash.com/photo-1543783207-ec64e4d95325?q=85&w=1920&auto=format&fit=crop">
-
     <!-- Audio Element -->
     <audio id="ambient-audio" loop class="hidden"></audio>
 
     <!-- ═══════════════════════════════════════════════════════════════
-         HERO SECTION
+         CABECERA / NAV
          ═══════════════════════════════════════════════════════════════ -->
-    <section id="hero-section"
-        class="relative w-full h-screen overflow-hidden flex flex-col justify-center items-center text-center z-10">
-
-        <!-- Dynamic Background Container -->
-        <div id="hero-bg" class="absolute inset-0 z-0 bg-slate-900">
-            <div class="absolute inset-0 bg-cover bg-center scale-110 transition-transform duration-[10s] ease-linear"
-                style="background-image: url('https://images.unsplash.com/photo-1539037116277-4db20889f2d4?q=85&w=1920&auto=format&fit=crop');">
-            </div>
+    <header class="relative z-40 w-full max-w-7xl mx-auto px-6 pt-6 flex items-center justify-between">
+        <div class="flex items-baseline gap-3">
+            <span class="font-serif italic text-xl md:text-2xl tracking-tight">NextGen Europa</span>
+            <span class="eyebrow hidden sm:inline">Forecast · Ed. 2026</span>
         </div>
-
-        <!-- Gradient Overlay -->
-        <div class="absolute inset-0 z-[1] pointer-events-none"
-            style="background: linear-gradient(180deg, rgba(15,23,42,0.1) 0%, rgba(15,23,42,0.4) 60%, rgba(10,15,30,1) 100%);">
-        </div>
-
-        <!-- Hero Content -->
-        <div class="relative z-10 max-w-5xl px-6 flex flex-col items-center">
-
-            <p class="hero-line hero-subtitle text-blue-300 font-serif italic text-xl md:text-2xl mb-8 tracking-widest uppercase"
-                style="text-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);">
-                Midnight Voyager Collection
-            </p>
-
-            <h1
-                class="hero-title font-serif text-6xl md:text-8xl lg:text-9xl font-medium text-white mb-12 tracking-tighter leading-none">
-                <span class="hero-line block">Discover</span>
-                <span
-                    class="hero-line block text-transparent bg-clip-text bg-gradient-to-r from-blue-200 via-blue-400 to-blue-600">
-                    The Unknown
-                </span>
-            </h1>
-
-            <!-- City Select -->
-            <div class="hero-ui w-full max-w-md relative z-[100] transform translate-y-4">
-                <button id="city-trigger" type="button" aria-haspopup="listbox" aria-expanded="false"
-                    aria-controls="city-dropdown" aria-label="Seleccionar destino de viaje"
-                    class="w-full bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-3 flex items-center justify-between shadow-2xl transition-all duration-300 hover:bg-white/10 hover:border-blue-500/30 group focus:outline-none focus:ring-2 focus:ring-blue-500/30">
-
-                    <div class="flex items-center gap-4 pl-4">
-                        <i
-                            class="fas fa-search-location text-xl text-blue-400 group-hover:scale-110 transition-transform"></i>
-                        <span id="trigger-text" class="font-sans text-lg text-white/90 font-light">Explorar
-                            Destinos</span>
-                    </div>
-
-                    <div class="pr-4 text-white/40 group-hover:text-blue-400 transition-colors">
-                        <i id="trigger-icon" class="fas fa-chevron-down transition-transform duration-300"></i>
-                    </div>
-                </button>
-
-                <!-- Dropdown Menu -->
-                <div id="city-dropdown" role="listbox" aria-label="Lista de ciudades" tabindex="-1"
-                    class="absolute top-full left-0 w-full mt-3 bg-slate-900/90 backdrop-blur-2xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl opacity-0 invisible transform -translate-y-4 transition-all duration-300 max-h-[300px] overflow-y-auto">
-                </div>
-            </div>
-
-            <!-- Current City Indicator -->
-            <div
-                class="hero-ui mt-8 flex items-center gap-3 bg-white/5 backdrop-blur-xl p-2 px-5 rounded-full border border-white/10 relative z-10">
-                <div class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
-                <span class="text-white/60 font-light tracking-wide text-sm">SEÑAL SATELITAL EN VIVO: <span
-                        id="hero-city-display" class="text-white font-medium">Madrid</span></span>
-            </div>
-        </div>
-
-        <!-- Scroll Indicator -->
-        <div
-            class="scroll-indicator absolute bottom-10 left-1/2 transform -translate-x-1/2 text-white/30 flex flex-col items-center gap-2">
-            <span class="text-[10px] uppercase tracking-[0.2em]">Explorar</span>
-            <div class="w-[1px] h-12 bg-gradient-to-b from-white/30 to-transparent"></div>
-        </div>
-
-        <!-- Controls -->
-        <div class="absolute top-6 right-6 z-50 flex gap-4">
+        <div class="flex gap-3">
+            <button id="locate-btn" class="glass-btn-icon group flex items-center justify-center gap-2"
+                aria-label="Usar mi ubicación actual">
+                <i class="fas fa-location-crosshairs transition-colors"></i>
+            </button>
             <button id="audio-toggle" class="glass-btn-icon group flex items-center justify-center gap-2"
                 aria-label="Activar o desactivar sonido ambiental">
-                <i class="fas fa-volume-mute text-white/50 group-hover:text-white transition-colors"></i>
+                <i class="fas fa-volume-mute transition-colors"></i>
                 <div id="audio-equalizer"
                     class="flex items-end gap-[3px] h-3.5 hidden opacity-0 transition-opacity duration-300">
-                    <div class="w-[3px] bg-blue-400 rounded-t-sm h-full"
+                    <div class="w-[3px] bg-accent rounded-t-sm h-full"
                         style="animation: eq 0.8s ease-in-out infinite alternate;"></div>
-                    <div class="w-[3px] bg-blue-300 rounded-t-sm h-2/3"
+                    <div class="w-[3px] bg-accent rounded-t-sm h-2/3"
                         style="animation: eq 1.1s ease-in-out infinite alternate-reverse;"></div>
-                    <div class="w-[3px] bg-blue-400 rounded-t-sm h-full"
+                    <div class="w-[3px] bg-accent rounded-t-sm h-full"
                         style="animation: eq 0.9s ease-in-out infinite alternate;"></div>
                 </div>
             </button>
         </div>
+    </header>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         HERO — Split editorial: tipografía + marco fotográfico
+         ═══════════════════════════════════════════════════════════════ -->
+    <section id="hero-section"
+        class="relative w-full max-w-7xl mx-auto px-6 pt-10 md:pt-16 pb-16 md:pb-24 z-10 min-h-[88vh] flex flex-col justify-center">
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
+
+            <!-- Columna tipográfica -->
+            <div class="lg:col-span-7 flex flex-col items-start">
+                <p class="hero-line hero-subtitle eyebrow eyebrow--accent mb-6">
+                    Midnight Voyager Collection
+                </p>
+
+                <h1 class="hero-title font-serif text-5xl md:text-7xl lg:text-8xl text-ink mb-8 leading-[0.95] tracking-tight">
+                    <span class="hero-line block">El clima de Europa,</span>
+                    <span class="hero-line block italic text-accent">en primera clase.</span>
+                </h1>
+
+                <p class="hero-line text-ink-soft text-base md:text-lg font-light max-w-xl mb-10 leading-relaxed">
+                    Pronóstico de 7 días para las capitales del continente, con itinerarios
+                    curados según el tiempo real. Elige destino y despega.
+                </p>
+
+                <!-- Selector de ciudad -->
+                <div class="hero-ui w-full max-w-md relative z-[100] rounded-2xl">
+                    <button id="city-trigger" type="button" aria-haspopup="listbox" aria-expanded="false"
+                        aria-controls="city-dropdown" aria-label="Seleccionar destino de viaje"
+                        class="w-full rounded-2xl p-3 flex items-center justify-between transition-all duration-300 group focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-paper focus:ring-[var(--brand-accent)]">
+
+                        <div class="flex items-center gap-4 pl-4">
+                            <i class="fas fa-search-location text-xl text-accent group-hover:scale-110 transition-transform"></i>
+                            <span id="trigger-text" class="font-sans text-lg text-ink font-light">Explorar
+                                Destinos</span>
+                        </div>
+
+                        <div class="pr-4 text-ink-faint group-hover:text-accent transition-colors">
+                            <i id="trigger-icon" class="fas fa-chevron-down transition-transform duration-300"></i>
+                        </div>
+                    </button>
+
+                    <!-- Dropdown Menu -->
+                    <div id="city-dropdown" role="listbox" aria-label="Lista de ciudades" tabindex="-1"
+                        class="absolute top-full left-0 w-full mt-3 rounded-2xl overflow-hidden opacity-0 invisible transform -translate-y-4 transition-all duration-300 max-h-[300px] overflow-y-auto">
+                    </div>
+                </div>
+
+                <!-- Indicador de señal -->
+                <div class="hero-ui live-chip mt-8 flex items-center gap-3 p-2 px-5 rounded-full relative z-10">
+                    <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                    <span class="text-ink-soft font-light tracking-wide text-xs uppercase tracking-[0.15em]">Señal en vivo ·
+                        <span id="hero-city-display" class="text-ink font-semibold normal-case tracking-normal text-sm">Madrid</span>
+                    </span>
+                </div>
+            </div>
+
+            <!-- Columna fotográfica: marco editorial -->
+            <div class="lg:col-span-5 w-full">
+                <div class="hero-media-frame aspect-[4/5] w-full max-w-md mx-auto lg:max-w-none">
+                    <!-- Contenedor de capas dinámicas (HeroManager) -->
+                    <div id="hero-bg" class="absolute inset-0 z-0">
+                        <div class="absolute inset-0 bg-cover bg-center scale-105 transition-transform duration-[10s] ease-linear"
+                            style="background-image: url('https://images.unsplash.com/photo-1539037116277-4db20889f2d4?q=85&w=1920&auto=format&fit=crop');">
+                        </div>
+                    </div>
+                    <div class="hero-media-caption">
+                        <span class="text-[10px] uppercase tracking-[0.25em] font-bold opacity-80">Destino en pantalla</span>
+                        <i class="fas fa-arrow-down text-xs opacity-70"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Scroll Indicator -->
+        <div class="scroll-indicator absolute bottom-6 left-6 md:left-1/2 md:-translate-x-1/2 text-ink-faint flex items-center gap-3">
+            <span class="text-[10px] uppercase tracking-[0.2em]">Explorar</span>
+            <div class="w-12 h-[1px] bg-gradient-to-r from-ink-faint to-transparent"></div>
+        </div>
     </section>
 
     <!-- ═══════════════════════════════════════════════════════════════
-         MAIN CONTENT
+         CONTENIDO PRINCIPAL
          ═══════════════════════════════════════════════════════════════ -->
-    <main class="w-full max-w-7xl mx-auto px-4 pt-12 md:pt-20 pb-4 md:pb-8 flex flex-col relative z-10">
+    <main class="w-full max-w-7xl mx-auto px-6 pt-4 md:pt-8 pb-4 md:pb-8 flex flex-col relative z-10">
 
-        <!-- Toast Container -->
-        <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-3 pointer-events-none"
+        <!-- Toast Container (z > mapa expandido para no quedar tapado) -->
+        <div id="toast-container" class="fixed bottom-5 right-5 z-[1100] flex flex-col gap-3 pointer-events-none"
             aria-live="polite" role="status"></div>
+
+        <!-- Anuncios para lectores de pantalla (cambios de pronóstico) -->
+        <div id="sr-status" class="sr-only" aria-live="polite" role="status"></div>
 
         <section class="flex-grow flex flex-col">
 
-            <!-- Forecast Title -->
-            <div class="mb-8 text-center flex flex-col items-center justify-center" id="forecast-title-container">
-                <h2
-                    class="font-serif text-3xl md:text-5xl text-white mb-2 tracking-tight flex items-center justify-center gap-4">
-                    <span id="city-name-display" class="relative"></span>
-                    <span
-                        class="px-3 py-1 bg-white/5 border border-white/10 rounded-full text-[10px] font-sans uppercase tracking-[0.2em] text-white/50 backdrop-blur-md align-middle translate-y-[-2px]">
-                        Capital
-                    </span>
-                </h2>
+            <!-- Encabezado de sección: regla suiza + índice -->
+            <div class="section-rule mb-10 flex flex-col md:flex-row md:items-end md:justify-between gap-4"
+                id="forecast-title-container">
+                <div>
+                    <p class="eyebrow mb-3"><span class="section-index">01</span> — Ahora mismo</p>
+                    <h2 class="font-serif text-4xl md:text-6xl text-ink tracking-tight flex items-center gap-4 flex-wrap">
+                        <span id="city-name-display" class="relative"></span>
+                        <span id="capital-badge"
+                            class="px-3 py-1 border border-hairline bg-surface rounded-full text-[10px] font-sans uppercase tracking-[0.2em] text-ink-soft align-middle translate-y-[-4px]">
+                            Capital
+                        </span>
+                    </h2>
+                </div>
+                <p class="eyebrow hidden md:block">Pronóstico · 7 días</p>
             </div>
 
             <!-- Error State -->
             <div id="error-state" class="flex-grow flex-col items-center justify-center glass-panel hidden">
             </div>
 
-            <!-- Bento Grid Forecast -->
-            <div id="forecast-bento" class="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full mb-12">
+            <!-- Retícula del pronóstico -->
+            <div id="forecast-bento" class="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full mb-16">
 
-                <!-- Main Current Weather -->
+                <!-- Panel principal: clima actual -->
                 <div class="lg:col-span-2 flex flex-col gap-6">
                     <div id="bento-main"
                         class="glass-panel p-8 md:p-12 relative overflow-hidden min-h-[350px] flex flex-col md:flex-row items-center justify-between group">
@@ -224,24 +261,22 @@
                             </div>
                             <div class="skeleton-bone h-40 w-40 md:h-64 md:w-64 rounded-full mt-6 md:mt-0"></div>
                         </div>
-                        <div class="skeleton-bone h-32 w-32 rounded-full mt-6 md:mt-0"></div>
                     </div>
                 </div>
 
-                <!-- Map + Chart (Stacked on Desktop for more width) -->
+                <!-- Mapa + Chart -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:flex lg:flex-col gap-6 h-full">
-                    <!-- Map -->
+                    <!-- Mapa -->
                     <div id="map-wrapper"
                         class="glass-panel h-64 md:h-80 lg:h-auto lg:flex-1 relative group overflow-hidden transition-all duration-500">
                         <div id="map" class="absolute inset-0 z-10 m-2 rounded-lg overflow-hidden">
                         </div>
                         <div
-                            class="absolute top-4 left-4 z-20 bg-slate-900/60 backdrop-blur-md border border-white/10 px-3 py-1 rounded-lg text-xs text-blue-300 font-bold shadow-lg pointer-events-none">
-                            <i class="fas fa-location-dot mr-1 text-emerald-400 animate-pulse"></i> SAT. VIVO
+                            class="absolute top-4 left-4 z-20 bg-surface border border-hairline px-3 py-1 rounded-lg text-[10px] uppercase tracking-[0.15em] text-ink-soft font-bold shadow-sm pointer-events-none">
+                            <i class="fas fa-location-dot mr-1 text-emerald-600"></i> Sat. en vivo
                         </div>
-                        <!-- Native Expansion Control escaping Leaflet's Stacking Context -->
                         <button id="map-expand-btn"
-                            class="absolute top-4 right-4 z-[900] bg-slate-900/80 backdrop-blur w-10 h-10 flex items-center justify-center rounded-xl border border-white/20 text-white/70 hover:text-white transition-all drop-shadow-xl hover:bg-white/10 group-hover:opacity-100 md:opacity-0 focus:opacity-100"
+                            class="absolute top-4 right-4 z-[900] bg-surface w-10 h-10 flex items-center justify-center rounded-xl border border-hairline text-ink-soft hover:text-ink transition-all shadow-sm hover:shadow-md group-hover:opacity-100 md:opacity-0 focus:opacity-100"
                             aria-label="Expandir Mapa">
                             <i class="fas fa-expand-arrows-alt transition-transform group-hover:scale-110"></i>
                         </button>
@@ -251,8 +286,8 @@
                     <div id="chart-container"
                         class="glass-panel p-4 relative h-64 md:h-80 lg:h-auto lg:flex-1 flex flex-col justify-end">
                         <h3
-                            class="absolute top-4 left-4 text-white/40 font-sans text-xs font-medium uppercase tracking-widest flex items-center gap-2 mb-0">
-                            <i class="fas fa-chart-line"></i> Tendencia 7 Días
+                            class="absolute top-4 left-4 eyebrow flex items-center gap-2 mb-0">
+                            <i class="fas fa-chart-line text-accent"></i> Tendencia 7 días
                         </h3>
                         <div class="w-full h-[85%] relative">
                             <canvas id="tempChart"></canvas>
@@ -261,23 +296,22 @@
                 </div>
             </div>
 
-            <!-- 7-Day List (Full Width on Desktop) -->
-            <div class="lg:col-span-3 glass-panel overflow-hidden flex flex-col h-full min-h-[400px]">
+            <!-- Lista semanal -->
+            <div class="glass-panel overflow-hidden flex flex-col h-full min-h-[400px] mb-16">
                 <div
-                    class="px-6 py-8 md:px-8 md:py-10 border-b border-white/5 sticky top-0 z-10 bg-white/[0.02] backdrop-blur-md">
-                    <h3 class="font-serif text-2xl md:text-3xl text-white font-semibold text-lift mb-1 tracking-tight">
-                        Próxima Semana</h3>
-                    <p class="text-[10px] md:text-xs text-blue-200/50 uppercase tracking-[0.2em] font-medium text-lift">
-                        Pronóstico Extendido</p>
+                    class="px-6 py-8 md:px-8 md:py-10 border-b border-hairline sticky top-0 z-10 bg-surface/90 backdrop-blur-sm">
+                    <p class="eyebrow mb-2"><span class="section-index">02</span> — Pronóstico extendido</p>
+                    <h3 class="font-serif text-2xl md:text-3xl text-ink tracking-tight">
+                        Próxima semana</h3>
                 </div>
                 <div id="bento-list" class="flex-grow flex flex-col p-0 overflow-y-auto no-scrollbar">
                     <!-- Skeleton List -->
-                    <div class="flex items-center justify-between p-6 border-b border-white/5 animate-pulse">
+                    <div class="flex items-center justify-between p-6 border-b border-hairline animate-pulse">
                         <div class="skeleton-bone h-4 w-12"></div>
                         <div class="skeleton-bone h-8 w-8 rounded-full"></div>
                         <div class="skeleton-bone h-4 w-16"></div>
                     </div>
-                    <div class="flex items-center justify-between p-6 border-b border-white/5 animate-pulse"
+                    <div class="flex items-center justify-between p-6 border-b border-hairline animate-pulse"
                         style="animation-delay: 0.1s">
                         <div class="skeleton-bone h-4 w-12"></div>
                         <div class="skeleton-bone h-8 w-8 rounded-full"></div>
@@ -290,108 +324,107 @@
                     </div>
                 </div>
             </div>
-            </div>
 
-            <!-- Itinerary CTA -->
-            <div class="text-center mb-12 opacity-0" id="itinerary-cta">
+            <!-- CTA Itinerario -->
+            <div class="text-center mb-16 opacity-0" id="itinerary-cta">
+                <p class="eyebrow mb-5"><span class="section-index">03</span> — Tu viaje</p>
                 <button id="btn-generate-itinerary" class="btn-luxury group">
                     <span class="relative z-10 flex items-center gap-3">
-                        <i class="fas fa-magic text-blue-400 group-hover:animate-pulse"></i>
+                        <i class="fas fa-magic"></i>
                         Diseñar mi Itinerario Perfecto
                     </span>
                 </button>
             </div>
 
-            <!-- Itinerary Modal -->
-            <div id="itinerary-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
-                <div class="absolute inset-0 bg-black/60 backdrop-blur-md" id="modal-backdrop"></div>
+            <!-- Modal de Itinerario -->
+            <div id="itinerary-modal" role="dialog" aria-modal="true" aria-labelledby="modal-city-name"
+                class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+                <div class="absolute inset-0 bg-ink/40 backdrop-blur-sm" id="modal-backdrop"></div>
                 <div class="glass-panel w-full max-w-2xl max-h-[80vh] overflow-y-auto relative z-10 p-8 transform scale-95 opacity-0 transition-all duration-300"
                     id="modal-content">
-                    <button class="absolute top-4 right-4 text-white/40 hover:text-white transition-colors"
+                    <button class="absolute top-4 right-4 text-ink-faint hover:text-ink transition-colors"
                         id="close-modal" aria-label="Cerrar modal de itinerario">
                         <i class="fas fa-times text-2xl"></i>
                     </button>
 
-                    <h2 class="text-3xl font-serif text-white mb-2">Tu Experiencia en <span id="modal-city-name"
-                            class="text-blue-400">Madrid</span></h2>
-                    <p class="text-white/50 mb-6 italic font-serif">Curada por nuestra IA basada en el clima real.</p>
+                    <p class="eyebrow mb-2">Itinerario curado</p>
+                    <h2 class="text-3xl font-serif text-ink mb-2">Tu experiencia en <span id="modal-city-name"
+                            class="text-accent italic">Madrid</span></h2>
+                    <p class="text-ink-soft mb-6 text-sm">Generado automáticamente según el clima real del destino.</p>
 
                     <div id="itinerary-content" class="space-y-6"></div>
 
                     <div class="mt-8 text-center">
                         <button class="btn-luxury-outline" id="save-itinerary">
-                            <i class="fas fa-download mr-2"></i> Guardar Plan
+                            <i class="fas fa-print mr-2"></i> Imprimir / Guardar PDF
                         </button>
                     </div>
                 </div>
             </div>
 
-            <!-- Offer Banner -->
+            <!-- Banner de Oferta -->
             <div id="offer-container" class="w-full hidden"></div>
 
         </section>
 
-        <!-- Footer -->
+        <!-- Footer editorial -->
         <footer
-            class="mt-12 pt-8 pb-8 px-8 text-center md:text-left text-xs md:text-sm w-full max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-12 relative z-10 border-t border-white/[0.03]">
+            class="mt-16 pt-10 pb-10 text-center md:text-left text-xs md:text-sm w-full max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-10 relative z-10 border-t-2 border-ink">
 
-            <!-- Branding & Copyright -->
+            <!-- Marca -->
             <div class="flex flex-col gap-2 items-center md:items-start">
-                <span class="font-serif italic text-white/80 text-xl md:text-2xl font-medium tracking-wide">Midnight
+                <span class="font-serif italic text-ink text-xl md:text-2xl tracking-tight">Midnight
                     Voyager Collection</span>
-                <span class="font-light tracking-widest text-white/20 text-[10px] md:text-xs">© 2026 NEXTGEN EUROPA
-                    TRAVEL AGENCY. POWERED BY AI.</span>
+                <span class="eyebrow">© 2026 NextGen Europa Travel Agency</span>
             </div>
 
-            <!-- Legal Links -->
-            <div class="flex gap-10 tracking-[0.2em] uppercase font-semibold text-[10px] text-white/40">
-                <a href="#" class="hover:text-white transition-colors">Privacidad</a>
-                <a href="#" class="hover:text-white transition-colors">Términos</a>
-                <a href="#" class="hover:text-white transition-colors">Concierge VIP</a>
+            <!-- Enlaces -->
+            <div class="flex gap-10 tracking-[0.2em] uppercase font-semibold text-[10px] text-ink-soft">
+                <a href="#" class="hover:text-ink transition-colors">Privacidad</a>
+                <a href="#" class="hover:text-ink transition-colors">Términos</a>
+                <a href="#" class="hover:text-ink transition-colors">Concierge VIP</a>
             </div>
 
-            <!-- Social Media -->
+            <!-- Social -->
             <div class="flex gap-8 text-lg md:text-xl">
-                <a href="#" class="text-white/20 hover:text-white hover:scale-110 transition-all"
+                <a href="#" class="text-ink-faint hover:text-ink hover:scale-110 transition-all"
                     aria-label="Instagram"><i class="fab fa-instagram"></i></a>
-                <a href="#" class="text-white/20 hover:text-white hover:scale-110 transition-all"
+                <a href="#" class="text-ink-faint hover:text-ink hover:scale-110 transition-all"
                     aria-label="Twitter"><i class="fab fa-twitter"></i></a>
-                <a href="#" class="text-white/20 hover:text-white hover:scale-110 transition-all"
+                <a href="#" class="text-ink-faint hover:text-ink hover:scale-110 transition-all"
                     aria-label="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
             </div>
         </footer>
     </main>
 
-    <!-- LocalForage CDN para IndexedDB -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
+    <!-- LocalForage (self-hosted) -->
+    <script src="vendor/localforage.min.js"></script>
 
-    <!-- Scripts -->
-    <script src="services/HeroManager.js" defer></script>
-    <script src="services/ExperienceManager.js" defer></script>
-    <script src="services/ItineraryService.js" defer></script>
-    <script src="services/Config.js" defer></script>
-    <script src="services/CacheManager.js" defer></script>
-    <script src="services/ChartManager.js" defer></script>
-    <script src="services/UIManager.js" defer></script>
-    <script src="app.js" defer></script>
-
-    <!-- PWA Service Worker Destroyer (For Local Dev/Cache Busting) -->
-    <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(function (registrations) {
-                for (let registration of registrations) {
-                    registration.unregister().then(boolean => {
-                        if (boolean) {
-                            console.log('[PWA] Killed residual Service Worker to force fresh UI.');
-                            if (!window.location.search.includes('sw=killed')) {
-                                window.location.search += (window.location.search ? '&' : '?') + 'sw=killed';
-                            }
-                        }
-                    });
-                }
-            });
-        }
+    <!-- Datos estructurados -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "NextGen Europa — Weather Forecast",
+        "description": "Pronóstico meteorológico editorial de 7 días para las capitales europeas, con itinerarios según el clima.",
+        "applicationCategory": "TravelApplication",
+        "operatingSystem": "Web",
+        "inLanguage": "es",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" }
+    }
     </script>
+
+    <noscript>
+        <div style="max-width:42rem;margin:4rem auto;padding:0 1.5rem;font-family:system-ui,sans-serif;text-align:center">
+            <h1>NextGen Europa — Forecast</h1>
+            <p>Pronóstico meteorológico de 7 días para Madrid, Londres, París, Berlín,
+            Roma, Barcelona y Ámsterdam. Esta aplicación necesita JavaScript activado.</p>
+        </div>
+    </noscript>
+
+    <!-- App: ES Modules — app.js importa Config y todos los servicios,
+         el orden lo garantiza el grafo de imports (no el orden de tags) -->
+    <script type="module" src="app.js"></script>
 </body>
 
 </html>

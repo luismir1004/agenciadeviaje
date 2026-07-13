@@ -6,8 +6,8 @@
     "scope": "./",
     "display": "standalone",
     "orientation": "portrait-primary",
-    "background_color": "#0F172A",
-    "theme_color": "#0F172A",
+    "background_color": "#F6F5F1",
+    "theme_color": "#F6F5F1",
     "categories": [
         "weather",
         "travel",
@@ -17,16 +17,28 @@
     "dir": "ltr",
     "icons": [
         {
-            "src": "icons/icon-192x192.svg",
+            "src": "icons/icon-192x192.png",
             "sizes": "192x192",
-            "type": "image/svg+xml",
+            "type": "image/png",
             "purpose": "any"
         },
         {
-            "src": "icons/icon-512x512.svg",
+            "src": "icons/icon-512x512.png",
             "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "icons/icon-512x512-maskable.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "icons/icon-512x512.svg",
+            "sizes": "any",
             "type": "image/svg+xml",
-            "purpose": "any maskable"
+            "purpose": "any"
         }
     ],
     "screenshots": [],

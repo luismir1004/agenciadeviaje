@@ -1,44 +1,15 @@
 // ═══════════════════════════════════════════════════════════════
-// SANITIZACIÓN XSS — Filtro ligero para datos de la API
+// NextGen Europa — WeatherApp (ES Modules)
 // ═══════════════════════════════════════════════════════════════
-/**
- * sanitize(value)
- * Escapa caracteres HTML peligrosos usando el DOM como parser seguro.
- * Protege contra XSS si la API 7Timer fuera comprometida.
- *
- * Transforma caracteres de riesgo:
- *  & → &amp;  |  < → &lt;  |  > → &gt;
- *  " → &quot; |  ' → &#x27; |  ` → &#x60;
- *
- * @param {any} value - Valor a sanitizar
- * @param {string} [type='text'] - 'text' | 'number' | 'icon'
- * @returns {string} Valor seguro para insertar en el DOM
- */
-function sanitize(value, type = 'text') {
-    // Rechazar null/undefined/NaN → valor neutro
-    if (value === null || value === undefined) return '';
-
-    // Números: validar rango y devolver string segura
-    if (type === 'number') {
-        const num = parseFloat(value);
-        if (isNaN(num) || num < -100 || num > 100) return '—';
-        return String(Math.round(num));
-    }
-
-    // Iconos FontAwesome (ej: 'fa-sun'): solo alfanuméricos y guiones
-    if (type === 'icon') {
-        return String(value).replace(/[^a-zA-Z0-9-]/g, '');
-    }
-
-    // Texto genérico: escapar entidades HTML peligrosas
-    // Usamos el truco DOM: textContent escapa automáticamente
-    const div = document.createElement('div');
-    div.textContent = String(value);
-    return div.innerHTML
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#x27;')
-        .replace(/`/g, '&#x60;');
-}
+import { APP_CONFIG, REDUCED_MOTION } from './services/Config.js';
+import { sanitize, safeUrl } from './services/sanitize.js';
+import { processForecastData, validateForecastData } from './services/forecastParser.js';
+import { CacheManager } from './services/CacheManager.js';
+import { UIManager } from './services/UIManager.js';
+import { HeroManager } from './services/HeroManager.js';
+import { ExperienceManager } from './services/ExperienceManager.js';
+import { ItineraryService } from './services/ItineraryService.js';
+import { ChartManager } from './services/ChartManager.js';
 
 class WeatherApp {
     #cache;
@@ -60,8 +31,17 @@ class WeatherApp {
     #pendingChartData = null;
     #audioCtx = null;
     #dynamicDeals = null;
+    #searchAbort = null;
 
     constructor() {
+        // prefers-reduced-motion: acelerar todos los tweens de GSAP hasta
+        // ser efectivamente instantáneos SIN perder los onComplete de los
+        // que depende la lógica (preloader, modal). Los bucles infinitos
+        // se omiten individualmente en su punto de creación.
+        if (REDUCED_MOTION) {
+            gsap.globalTimeline.timeScale(1000);
+        }
+
         // Services Initialization
         this.#cache = new CacheManager(30);
         this.#ui = new UIManager();
@@ -94,14 +74,54 @@ class WeatherApp {
         this.btnGenerate.addEventListener('click', () => this.showItinerary());
         this.closeModalBtn.addEventListener('click', () => this.toggleModal(false));
 
+        // Modal: cerrar con click en backdrop y con Escape
+        document.getElementById('modal-backdrop').addEventListener('click', () => this.toggleModal(false));
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            if (!this.modal.classList.contains('hidden')) {
+                this.toggleModal(false);
+            } else if (document.getElementById('map-wrapper')?.classList.contains('map-expanded')) {
+                this.#toggleMapExpand(false);
+            }
+        });
+
+        // Geolocalización bajo demanda (gesto explícito del usuario)
+        document.getElementById('locate-btn').addEventListener('click', () => {
+            this.#detectUserLocation().catch(() => { });
+        });
+
+        // Expansión del mapa a pantalla completa
+        document.getElementById('map-expand-btn').addEventListener('click', () => this.#toggleMapExpand());
+
+        // Exportación REAL del itinerario: hoja @media print aísla el
+        // contenido del modal y el diálogo del navegador genera el PDF.
         document.getElementById('save-itinerary').addEventListener('click', () => {
-            this.#ui.showToast('Itinerario guardado en PDF (Simulado)', 'success');
+            document.body.classList.add('print-itinerary');
+            window.print();
+        });
+        window.addEventListener('afterprint', () => {
+            document.body.classList.remove('print-itinerary');
+        });
+
+        // Notificación de actualización del SW (evento del registro, abajo)
+        window.addEventListener('sw-update-available', (e) => {
+            const worker = e.detail?.worker;
+            if (!worker) return;
+            this.#ui.showToast('Nueva versión disponible.', 'info', {
+                action: {
+                    label: 'Recargar',
+                    handler: () => worker.postMessage({ type: 'SKIP_WAITING' })
+                }
+            });
         });
 
         // Listen for online/offline events
         window.addEventListener('online', () => {
             this.#ui.showToast('Conexión restablecida.', 'success');
             this.#setError(false);
+            // Refrescar datos automáticamente al recuperar la conexión
+            const lastCity = this.#cache.getSession('lastCity');
+            this.handleCityChange(lastCity !== null ? lastCity : 0, false);
         });
         window.addEventListener('offline', () => {
             this.#ui.showToast('Sin conexión a internet.', 'error');
@@ -123,8 +143,16 @@ class WeatherApp {
             }
         });
 
-        // Mesh gradient parallax on mouse
-        this.#initMeshParallax();
+        // Si el esquema del SO cambia, re-resolver la variante de acento AA
+        window.matchMedia?.('(prefers-color-scheme: dark)')
+            .addEventListener?.('change', () => {
+                this.#applyWeatherTheme(this.#currentWeatherRaw || 'pcloudy');
+            });
+
+        // Mesh gradient parallax on mouse (omitido con movimiento reducido)
+        if (!REDUCED_MOTION) {
+            this.#initMeshParallax();
+        }
 
         await this.#initApp();
         this.#initAccessibility();
@@ -135,19 +163,28 @@ class WeatherApp {
      * They only instantiate when the user scrolls to the forecast section.
      */
     #setupLazyInit() {
+        // B6: cada init aislado en su try/catch — si un CDN falla (Leaflet,
+        // Chart.js), el otro componente debe inicializarse igualmente.
+        const safeInit = () => {
+            if (!this.#mapReady) {
+                try { this.#initMap(); } catch (e) { console.warn('Mapa no disponible:', e); }
+            }
+            if (!this.#chartReady) {
+                try { this.#initChart(); } catch (e) { console.warn('Chart no disponible:', e); }
+            }
+        };
+
         const forecastBento = document.getElementById('forecast-bento');
         if (!forecastBento) {
             // Fallback: init immediately if element not found
-            this.#initMap();
-            this.#initChart();
+            safeInit();
             return;
         }
 
         const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
-                    if (!this.#mapReady) this.#initMap();
-                    if (!this.#chartReady) this.#initChart();
+                    safeInit();
                     observer.unobserve(entry.target);
                 }
             });
@@ -193,17 +230,23 @@ class WeatherApp {
         } else {
             this.#hero.animateEntrance();
         }
-
-        this.#detectUserLocation()
-            .catch(() => { });
     }
 
+    /**
+     * Geolocalización bajo demanda (gesto del usuario, no automática).
+     * Comparte el AbortController del flujo de ciudades: si el usuario
+     * selecciona una ciudad mientras esto está en vuelo, se aborta y
+     * nunca sobrescribe datos más recientes.
+     */
     #detectUserLocation() {
         return new Promise((resolve, reject) => {
             if (!navigator.geolocation) {
+                this.#ui.showToast('Tu navegador no soporta geolocalización.', 'error');
                 reject(new Error('Geolocation not supported'));
                 return;
             }
+
+            this.#ui.showToast('📍 Localizando...', 'info');
 
             navigator.geolocation.getCurrentPosition(
                 async (pos) => {
@@ -212,30 +255,49 @@ class WeatherApp {
                         name: 'Tu Ubicación',
                         coords: { lat: latitude, lon: longitude }
                     };
+
+                    // Cancelar cualquier fetch pendiente y reservar un signal propio
+                    if (this.#abortController) this.#abortController.abort();
+                    this.#abortController = new AbortController();
+                    const signal = this.#abortController.signal;
+
                     this.#currentCityName = localCity.name;
 
                     try {
-                        this.#ui.showToast('📍 Localizando...', 'info');
                         this.#hero.updateCity(localCity.name);
                         this.updateExperience(localCity.name);
+                        this.#toggleCapitalBadge(false);
+                        this.offerContainer.classList.add('hidden');
 
-                        await this.loadCityWeather(localCity, false, false);
-                        this.#ui.showToast('Ubicación actualizada.', 'success');
+                        // B8: reflejar la ubicación también en el selector —
+                        // el trigger no debe seguir mostrando la ciudad anterior
+                        const triggerText = document.getElementById('trigger-text');
+                        if (triggerText) triggerText.textContent = 'Tu Ubicación';
+                        document.querySelectorAll('.dropdown-item').forEach(el => el.classList.remove('selected'));
+
+                        const ok = await this.loadCityWeather(localCity, false, true, false, signal);
+                        if (ok && !signal.aborted) this.#ui.showToast('Ubicación actualizada.', 'success');
                         resolve('Success');
                     } catch (e) {
                         reject(e);
                     }
                 },
                 (err) => {
+                    this.#ui.showToast('No se pudo obtener tu ubicación.', 'error');
                     reject(new Error(`Geolocation error: ${err.message}`));
                 },
                 {
                     enableHighAccuracy: true,
-                    timeout: 2500,
-                    maximumAge: 0
+                    timeout: 8000,
+                    maximumAge: 60000
                 }
             );
         });
+    }
+
+    #toggleCapitalBadge(isCapital) {
+        const badge = document.getElementById('capital-badge');
+        if (badge) badge.classList.toggle('hidden', !isCapital);
     }
 
     #initMap() {
@@ -245,7 +307,9 @@ class WeatherApp {
         const city = APP_CONFIG.CITIES.find(c => c.name === this.#currentCityName) || APP_CONFIG.CITIES[0];
 
         this.#map = L.map('map', { zoomControl: false }).setView([city.coords.lat, city.coords.lon], 12);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        const darkTiles = window.matchMedia
+            && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        L.tileLayer(`https://{s}.basemaps.cartocdn.com/${darkTiles ? 'dark_all' : 'light_all'}/{z}/{x}/{y}{r}.png`, {
             attribution: '&copy; OpenStreetMap &copy; CARTO',
             subdomains: 'abcd',
             maxZoom: 19
@@ -266,6 +330,32 @@ class WeatherApp {
         }
     }
 
+    /**
+     * Expande/colapsa el mapa a pantalla completa.
+     * @param {boolean} [force] - true/false fuerza estado; undefined alterna
+     */
+    #toggleMapExpand(force) {
+        const wrapper = document.getElementById('map-wrapper');
+        const btn = document.getElementById('map-expand-btn');
+        if (!wrapper || !btn) return;
+
+        const expand = force !== undefined ? force : !wrapper.classList.contains('map-expanded');
+        wrapper.classList.toggle('map-expanded', expand);
+        this.#syncBodyScrollLock();
+
+        const icon = btn.querySelector('i');
+        if (icon) icon.className = expand
+            ? 'fas fa-compress-arrows-alt transition-transform group-hover:scale-110'
+            : 'fas fa-expand-arrows-alt transition-transform group-hover:scale-110';
+        btn.setAttribute('aria-label', expand ? 'Contraer Mapa' : 'Expandir Mapa');
+
+        // Asegurar que Leaflet exista y recalcule el viewport tras la transición
+        if (expand && !this.#mapReady) this.#initMap();
+        setTimeout(() => {
+            if (this.#map) this.#map.invalidateSize();
+        }, 350);
+    }
+
     updateMap(lat, lon) {
         if (!this.#map) return;
 
@@ -282,18 +372,28 @@ class WeatherApp {
             if (this.#map) this.#map.invalidateSize();
         }, 400);
 
+        this.#renderMarker(lat, lon);
+    }
+
+    /**
+     * (Re)dibuja el marcador y su popup con los datos actuales.
+     * Se llama al volar a una ciudad (placeholder con datos previos) y
+     * de nuevo tras el render del forecast, ya con los datos reales (B2).
+     */
+    #renderMarker(lat, lon) {
+        if (!this.#map || isNaN(lat) || isNaN(lon)) return;
+
         // Remove old markers
         this.#map.eachLayer((layer) => {
             if (layer instanceof L.Marker) this.#map.removeLayer(layer);
         });
 
-        // Custom Leaflet DivIcon para el marker Dark Glass con SVG
         const safeWeatherCode = (this.#currentWeatherRaw || 'clear').replace('day', '').replace('night', '');
         const weatherCode = APP_CONFIG.WEATHER_MAP[safeWeatherCode]?.svg || APP_CONFIG.WEATHER_MAP['clear'].svg;
         const markerHtml = `
             <div class="relative flex items-center justify-center w-12 h-12">
-                <div class="absolute inset-0 bg-blue-500/20 rounded-full animate-ping"></div>
-                <div class="relative z-10 w-10 h-10 bg-slate-900/90 border border-white/20 rounded-full shadow-[0_0_15px_rgba(59,130,246,0.5)] backdrop-blur-md flex items-center justify-center text-blue-400 p-2 drop-shadow-[0_0_10px_currentColor]">
+                <div class="absolute inset-0 bg-accent-dim rounded-full animate-ping"></div>
+                <div class="relative z-10 w-10 h-10 bg-surface border-2 border-accent rounded-full shadow-lg flex items-center justify-center text-accent p-2">
                     ${weatherCode}
                 </div>
             </div>
@@ -309,9 +409,9 @@ class WeatherApp {
 
         const popupContent = `
             <div class="text-center font-sans tracking-wide">
-                <div class="text-blue-400 font-bold mb-1 text-base">${this.#currentCityName}</div>
-                <div class="text-white/60 text-[9px] uppercase tracking-[0.2em] font-bold" id="popup-temp">
-                    ${this.#currentTempRaw !== undefined ? this.#currentTempRaw + '°' : 'LIVE SAT'}
+                <div class="text-accent font-bold mb-1 text-base font-serif">${sanitize(this.#currentCityName)}</div>
+                <div class="text-ink-soft text-[9px] uppercase tracking-[0.2em] font-bold" id="popup-temp">
+                    ${this.#currentTempRaw}°
                 </div>
             </div>
         `;
@@ -325,30 +425,51 @@ class WeatherApp {
         const dropdown = document.getElementById('city-dropdown');
         const trigger = document.getElementById('city-trigger');
 
-        dropdown.innerHTML = APP_CONFIG.CITIES.map((city, index) => `
-            <div class="dropdown-item p-4 flex items-center justify-between cursor-pointer border-b border-white/5 last:border-none group focus:outline-none"
-                 role="option" id="city-option-${index}" tabindex="-1" data-value="${index}" aria-selected="false">
-                <div class="flex items-center gap-3">
-                    <div class="flex flex-col">
-                        <span class="city-name font-serif text-lg text-white group-hover:text-blue-400 transition-colors">${city.name}</span>
-                        <span class="text-[10px] text-white/40 uppercase tracking-widest">${city.country}</span>
-                    </div>
-                    ${city.isCapital ? `<span class="text-[9px] font-bold text-blue-500/80 px-1.5 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded uppercase tracking-tighter ml-auto">Capital</span>` : ''}
-                </div>
-                <i class="fas fa-chevron-right text-white/20 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all"></i>
+        dropdown.innerHTML = `
+            <div class="city-search-box">
+                <input id="city-search" class="city-search-input" type="text"
+                       placeholder="Buscar cualquier ciudad del mundo..."
+                       autocomplete="off" role="searchbox" aria-label="Buscar ciudad" />
             </div>
-        `).join('');
+            <div id="city-options"></div>
+        `;
+        this.#renderCityOptions();
 
-        // Event Delegation for items
+        // Event Delegation: items estáticos (data-value) y resultados
+        // del buscador (data-lat/lon) comparten el mismo camino.
         dropdown.addEventListener('click', (e) => {
             const item = e.target.closest('.dropdown-item');
             if (!item) return;
 
             e.stopPropagation();
-            const index = parseInt(item.dataset.value);
-            this.handleCityChange(index);
+            if (item.dataset.value !== undefined) {
+                this.handleCityChange(parseInt(item.dataset.value));
+            } else if (item.dataset.lat !== undefined) {
+                this.#selectDynamicCity({
+                    name: item.dataset.name,
+                    country: item.dataset.country,
+                    coords: { lat: parseFloat(item.dataset.lat), lon: parseFloat(item.dataset.lon) },
+                    timezone: item.dataset.tz || 'UTC'
+                });
+            }
             this.toggleDropdown(false);
         });
+
+        // Buscador global de ciudades (Open-Meteo Geocoding, debounce 300ms)
+        const searchInput = dropdown.querySelector('#city-search');
+        searchInput.addEventListener('click', (e) => e.stopPropagation());
+        let debounceId = null;
+        searchInput.addEventListener('input', () => {
+            clearTimeout(debounceId);
+            const q = searchInput.value.trim();
+            if (q.length < 2) {
+                this.#highlightedIndex = -1;
+                this.#renderCityOptions();
+                return;
+            }
+            debounceId = setTimeout(() => this.#searchCities(q), 300);
+        });
+        searchInput.addEventListener('keydown', (e) => this.#handleListKeydown(e));
 
         // Dropdown Trigger Click
         trigger.addEventListener('click', (e) => {
@@ -360,29 +481,117 @@ class WeatherApp {
         });
     }
 
+    /** Lista estática de destinos destacados (Config.CITIES). */
+    #renderCityOptions() {
+        const options = document.getElementById('city-options');
+        if (!options) return;
+        options.innerHTML = APP_CONFIG.CITIES.map((city, index) => `
+            <div class="dropdown-item p-4 flex items-center justify-between cursor-pointer border-b border-hairline last:border-none group focus:outline-none"
+                 role="option" id="city-option-${index}" tabindex="-1" data-value="${index}" aria-selected="false">
+                <div class="flex items-center gap-3">
+                    <div class="flex flex-col">
+                        <span class="city-name font-serif text-lg text-ink group-hover:text-accent transition-colors">${city.name}</span>
+                        <span class="text-[10px] text-ink-faint uppercase tracking-widest">${city.country}</span>
+                    </div>
+                    ${city.isCapital ? `<span class="text-[9px] font-bold text-accent-strong px-1.5 py-0.5 bg-accent-dim border border-hairline rounded uppercase tracking-tighter ml-auto">Capital</span>` : ''}
+                </div>
+                <i class="fas fa-chevron-right text-ink-faint opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all"></i>
+            </div>
+        `).join('');
+    }
+
+    /** Busca ciudades arbitrarias vía Open-Meteo Geocoding. */
+    async #searchCities(query) {
+        const options = document.getElementById('city-options');
+        if (!options) return;
+        options.innerHTML = `<div class="search-hint">Buscando "${sanitize(query)}"…</div>`;
+
+        try {
+            if (this.#searchAbort) this.#searchAbort.abort();
+            this.#searchAbort = new AbortController();
+
+            const url = `${APP_CONFIG.API.GEOCODING_BASE_URL}?name=${encodeURIComponent(query)}&count=6&language=es&format=json`;
+            const res = await fetch(url, { signal: this.#searchAbort.signal });
+            if (!res.ok) throw new Error(`Geocoding HTTP ${res.status}`);
+
+            const json = await res.json();
+            const results = json.results || [];
+            this.#highlightedIndex = -1;
+
+            if (results.length === 0) {
+                options.innerHTML = `<div class="search-hint">Sin resultados para "${sanitize(query)}"</div>`;
+                return;
+            }
+
+            options.innerHTML = results.map((r, i) => `
+                <div class="dropdown-item p-4 flex items-center justify-between cursor-pointer border-b border-hairline last:border-none group focus:outline-none"
+                     role="option" id="city-result-${i}" tabindex="-1" aria-selected="false"
+                     data-lat="${Number(r.latitude)}" data-lon="${Number(r.longitude)}"
+                     data-name="${sanitize(r.name)}" data-country="${sanitize(r.country || '')}"
+                     data-tz="${sanitize(r.timezone || 'UTC')}">
+                    <div class="flex flex-col">
+                        <span class="city-name font-serif text-lg text-ink group-hover:text-accent transition-colors">${sanitize(r.name)}</span>
+                        <span class="text-[10px] text-ink-faint uppercase tracking-widest">${sanitize([r.admin1, r.country].filter(Boolean).join(' · '))}</span>
+                    </div>
+                    <i class="fas fa-location-arrow text-ink-faint opacity-0 group-hover:opacity-100 transition-all"></i>
+                </div>
+            `).join('');
+        } catch (err) {
+            if (err.name === 'AbortError') return;
+            options.innerHTML = `<div class="search-hint">No se pudo buscar. Comprueba tu conexión.</div>`;
+        }
+    }
+
+    /** Carga el pronóstico de una ciudad arbitraria (buscador). */
+    async #selectDynamicCity(city) {
+        if (this.#abortController) this.#abortController.abort();
+        this.#abortController = new AbortController();
+        const signal = this.#abortController.signal;
+
+        this.#currentCityName = city.name;
+        this.#toggleCapitalBadge(false);
+        this.offerContainer.classList.add('hidden');
+
+        const triggerText = document.getElementById('trigger-text');
+        if (triggerText) triggerText.textContent = city.country ? `${city.name}, ${city.country}` : city.name;
+        document.querySelectorAll('.dropdown-item').forEach(el => el.classList.remove('selected'));
+
+        this.#playHapticClick();
+        this.#hero.updateCity(city.name);
+        this.updateExperience(city.name);
+
+        await this.loadCityWeather(city, false, true, true, signal);
+    }
+
     #initAccessibility() {
         const trigger = document.getElementById('city-trigger');
         const dropdown = document.getElementById('city-dropdown');
 
         trigger.addEventListener('keydown', (e) => {
             const isOpen = dropdown.classList.contains('open');
+            if ((e.key === 'Enter' || e.key === ' ') && !isOpen) {
+                e.preventDefault();
+                this.toggleDropdown(true);
+                return;
+            }
+            this.#handleListKeydown(e);
+        });
 
-            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        // Modal: focus trap — Tab cicla dentro del diálogo (WCAG 2.4.3)
+        this.modal.addEventListener('keydown', (e) => {
+            if (e.key !== 'Tab') return;
+            const focusables = this.modalContent.querySelectorAll(
+                'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+            );
+            if (focusables.length === 0) return;
+            const first = focusables[0];
+            const last = focusables[focusables.length - 1];
+            if (e.shiftKey && document.activeElement === first) {
                 e.preventDefault();
-                if (!isOpen) this.toggleDropdown(true);
-                this.#navigateDropdown(e.key === 'ArrowDown' ? 1 : -1);
-            }
-            else if (e.key === 'Enter' || e.key === ' ') {
+                last.focus();
+            } else if (!e.shiftKey && document.activeElement === last) {
                 e.preventDefault();
-                if (!isOpen) {
-                    this.toggleDropdown(true);
-                } else if (this.#highlightedIndex !== -1) {
-                    this.handleCityChange(this.#highlightedIndex);
-                    this.toggleDropdown(false);
-                }
-            }
-            else if (e.key === 'Escape') {
-                this.toggleDropdown(false);
+                first.focus();
             }
         });
 
@@ -394,30 +603,51 @@ class WeatherApp {
         });
     }
 
-    #navigateDropdown(step) {
-        const items = document.querySelectorAll('.dropdown-item');
+    /**
+     * Navegación de teclado compartida por el trigger y el buscador:
+     * flechas, Home/End, Enter (selecciona el resaltado) y Escape.
+     */
+    #handleListKeydown(e) {
+        const dropdown = document.getElementById('city-dropdown');
+        const isOpen = dropdown.classList.contains('open');
+        const items = dropdown.querySelectorAll('.dropdown-item');
+
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (!isOpen) this.toggleDropdown(true);
+            this.#highlightIndex(this.#highlightedIndex + (e.key === 'ArrowDown' ? 1 : -1));
+        } else if (e.key === 'Home' && isOpen && items.length) {
+            e.preventDefault();
+            this.#highlightIndex(0);
+        } else if (e.key === 'End' && isOpen && items.length) {
+            e.preventDefault();
+            this.#highlightIndex(items.length - 1);
+        } else if (e.key === 'Enter') {
+            if (isOpen && this.#highlightedIndex !== -1 && items[this.#highlightedIndex]) {
+                e.preventDefault();
+                items[this.#highlightedIndex].click();
+            }
+        } else if (e.key === 'Escape') {
+            this.toggleDropdown(false);
+        }
+    }
+
+    /** Resalta el item idx (con wrap-around) y sincroniza aria. */
+    #highlightIndex(idx) {
+        const items = document.getElementById('city-dropdown').querySelectorAll('.dropdown-item');
         if (items.length === 0) return;
 
-        // Remove old highlight
-        if (this.#highlightedIndex !== -1) {
+        if (this.#highlightedIndex !== -1 && items[this.#highlightedIndex]) {
             items[this.#highlightedIndex].classList.remove('highlighted');
             items[this.#highlightedIndex].ariaSelected = 'false';
         }
 
-        this.#highlightedIndex += step;
-
-        // Loop around
-        if (this.#highlightedIndex >= items.length) this.#highlightedIndex = 0;
-        if (this.#highlightedIndex < 0) this.#highlightedIndex = items.length - 1;
+        this.#highlightedIndex = ((idx % items.length) + items.length) % items.length;
 
         const activeItem = items[this.#highlightedIndex];
         activeItem.classList.add('highlighted');
         activeItem.ariaSelected = 'true';
-
-        // Scroll into view
         activeItem.scrollIntoView({ block: 'nearest' });
-
-        // Update aria-activedescendant
         document.getElementById('city-trigger').setAttribute('aria-activedescendant', activeItem.id);
     }
 
@@ -430,11 +660,21 @@ class WeatherApp {
             dropdown.classList.add('open');
             icon.style.transform = 'rotate(180deg)';
             trigger.setAttribute('aria-expanded', 'true');
+            // Foco directo al buscador para escribir sin click extra
+            dropdown.querySelector('#city-search')?.focus();
         } else {
             dropdown.classList.remove('open');
             icon.style.transform = 'rotate(0deg)';
             trigger.setAttribute('aria-expanded', 'false');
+            trigger.removeAttribute('aria-activedescendant');
             this.#highlightedIndex = -1;
+
+            // Reset del buscador: volver a la lista de destinos destacados
+            const searchInput = dropdown.querySelector('#city-search');
+            if (searchInput && searchInput.value) {
+                searchInput.value = '';
+                this.#renderCityOptions();
+            }
 
             // Clean up highlights
             document.querySelectorAll('.dropdown-item').forEach(i => {
@@ -474,6 +714,7 @@ class WeatherApp {
         if (!city) return;
 
         this.#currentCityName = city.name;
+        this.#toggleCapitalBadge(!!city.isCapital);
 
         // Persist selected city for session continuity
         this.#cache.saveSession('lastCity', cityIndex);
@@ -486,12 +727,21 @@ class WeatherApp {
         this.updateExperience(this.#currentCityName);
 
         // Load Weather (pass signal for cancellation)
-        await this.loadCityWeather(city, true, true, showToast, this.#abortController.signal);
-        this.updateOffer(cityIndex);
+        const signal = this.#abortController.signal;
+        const ok = await this.loadCityWeather(city, true, true, showToast, signal);
+
+        // B3: solo pintar la oferta si ESTA carga terminó bien y sigue vigente.
+        // Un flujo abortado (o fallido) no debe resucitar la oferta de su ciudad.
+        if (ok && !signal.aborted) {
+            this.updateOffer(cityIndex);
+        }
     }
 
     updateExperience(cityName) {
-        const data = this.#experience.getExperience(cityName);
+        // Ciudades sin experiencia curada (buscador/geolocalización) usan
+        // la imagen neutral de la Tierra
+        const data = this.#experience.getExperience(cityName)
+            || this.#experience.getExperience('Tu Ubicación');
         if (data) {
             this.#hero.setBackground(data.img, data.blur);
             this.#experience.updateAudio(cityName);
@@ -516,7 +766,7 @@ class WeatherApp {
     }
 
 
-    async loadCityWeather(city, showOffer = true, showLoader = true, showToast = true, signal = null) {
+    async loadCityWeather(city, _showOffer = true, showLoader = true, showToast = true, signal = null) {
         if (showLoader) this.setLoading(true);
 
         const titleSpan = document.getElementById('city-name-display');
@@ -562,44 +812,89 @@ class WeatherApp {
             }
 
             // Guard: if this request was aborted, stop rendering stale data
-            if (signal && signal.aborted) return;
+            if (signal && signal.aborted) return false;
 
-            const dailyForecasts = this.#processForecastData(data.dataseries, city);
+            const dailyForecasts = processForecastData(data, city);
             this.#currentForecast = dailyForecasts;
 
-            const validatedForecasts = this.#validateForecastData(dailyForecasts);
-            this.#renderForecast(validatedForecasts);
+            const validatedForecasts = validateForecastData(dailyForecasts);
 
-            // Chart may not be initialized yet if user hasn't scrolled
-            if (this.#chartReady && this.#chart) {
-                this.#chart.render(validatedForecasts);
-            } else {
-                this.#pendingChartData = validatedForecasts;
-            }
-
-            // Apply dynamic theme based on today's dominant weather
+            // Apply dynamic theme FIRST: the chart and accent-tinted UI
+            // read --brand-accent at render time, so the theme must be
+            // in place before they paint (otherwise they lag one city behind)
             if (validatedForecasts[0]) {
                 this.#applyWeatherTheme(validatedForecasts[0].weather);
             }
 
+            this.#renderForecast(validatedForecasts);
+
+            // Anunciar la actualización a lectores de pantalla (aria-live)
+            const srStatus = document.getElementById('sr-status');
+            if (srStatus) srStatus.textContent = `Mostrando pronóstico de ${this.#currentCityName}`;
+
+            // B2: refrescar marcador/popup del mapa AHORA que los datos
+            // reales existen (el updateMap inicial usó los del render previo)
+            this.#renderMarker(city.coords.lat, city.coords.lon);
+
+            // Chart may not be initialized yet if user hasn't scrolled.
+            // B6: un fallo del chart (p.ej. CDN caído) no debe convertirse
+            // en un falso "error de conexión" teniendo datos válidos.
+            if (this.#chartReady && this.#chart) {
+                try {
+                    this.#chart.render(validatedForecasts);
+                } catch (chartError) {
+                    console.warn('Chart no disponible:', chartError);
+                }
+            } else {
+                this.#pendingChartData = validatedForecasts;
+            }
+
+            // B1: el CTA se oculta con la clase `hidden` (display:none) en
+            // setLoading(true); animar opacidad no basta — hay que quitarla.
+            this.ctaContainer.classList.remove('hidden');
             gsap.to(this.ctaContainer, { opacity: 1, duration: 1, delay: 0.5 });
+
+            return true;
 
         } catch (error) {
             // Silently ignore aborted requests (user changed city)
-            if (error.name === 'AbortError') return;
+            if (error.name === 'AbortError') return false;
 
             this.#setError(true);
             this.#ui.showToast('Error de conexión con el satélite.', 'error');
+            return false;
         } finally {
-            this.setLoading(false);
+            // B4: si ESTA petición fue abortada, los skeletons visibles
+            // pertenecen al flujo nuevo — no debemos retirárselos.
+            if (!signal || !signal.aborted) {
+                this.setLoading(false);
+            }
         }
     }
 
-    async #fetchWithRetry(coords, attempt = 1, signal = null) {
+    /**
+     * Cadena de datos: Open-Meteo como PRIMARIO (rápido, fiable, con
+     * probabilidad de precipitación y viento reales) y 7Timer como
+     * fallback con reintentos exponenciales.
+     */
+    async #fetchWithRetry(coords, _attempt = 1, signal = null) {
+        try {
+            return await this.#fetchOpenMeteo(coords, signal);
+        } catch (error) {
+            if (error.name === 'AbortError') throw error;
+            // Sin red (503 del SW / navigator.onLine=false): el fallback
+            // también fallaría — directo a IndexedDB.
+            if (error.offline) throw error;
+
+            console.warn('Open-Meteo no disponible, usando 7Timer...', error.message);
+            return this.#fetchSevenTimer(coords, 1, signal);
+        }
+    }
+
+    async #fetchSevenTimer(coords, attempt = 1, signal = null) {
         try {
             return await this.#fetchWeatherData(coords, signal);
         } catch (error) {
-            // Don't retry aborted requests or non-retryable errors (4xx)
             if (error.name === 'AbortError') throw error;
             if (error.retryable === false) throw error;
 
@@ -607,10 +902,10 @@ class WeatherApp {
                 const delay = APP_CONFIG.API.RETRY_DELAY_MS * Math.pow(2, attempt - 1);
                 console.warn(`Retry attempt ${attempt} of ${APP_CONFIG.API.RETRY_ATTEMPTS}...`);
                 await new Promise(r => setTimeout(r, delay));
-                return this.#fetchWithRetry(coords, attempt + 1, signal);
+                return this.#fetchSevenTimer(coords, attempt + 1, signal);
             }
 
-            return await this.#fetchOpenMeteo(coords, signal);
+            throw error;
         }
     }
 
@@ -618,14 +913,14 @@ class WeatherApp {
         const safeLat = parseFloat(lat).toFixed(4);
         const safeLon = parseFloat(lon).toFixed(4);
 
-        console.warn('⚠️ Initiating Open-Meteo Fallback API...');
-
-        const url = `${APP_CONFIG.API.OPENMETEO_BASE_URL}?latitude=${safeLat}&longitude=${safeLon}&daily=temperature_2m_max,temperature_2m_min,weathercode&timezone=auto`;
+        const url = `${APP_CONFIG.API.OPENMETEO_BASE_URL}?latitude=${safeLat}&longitude=${safeLon}&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_probability_max,windspeed_10m_max&timezone=auto&forecast_days=7`;
         const response = await fetch(url, signal ? { signal } : undefined);
 
         if (!response.ok) {
-            const error = new Error(`Open-Meteo Fallback failed: HTTP ${response.status}`);
+            const error = new Error(`Open-Meteo failed: HTTP ${response.status}`);
             error.retryable = false;
+            error.offline = response.headers.get('X-SW-Offline') === 'true'
+                || navigator.onLine === false;
             throw error;
         }
 
@@ -637,10 +932,13 @@ class WeatherApp {
                 const max = json.daily.temperature_2m_max[i];
                 const min = json.daily.temperature_2m_min[i];
                 const code = json.daily.weathercode[i];
+                const rainProb = json.daily.precipitation_probability_max?.[i];
+                const windMax = json.daily.windspeed_10m_max?.[i];
 
                 let weather = 'clear';
                 if (code >= 1 && code <= 2) weather = 'pcloudy';
                 else if (code === 3) weather = 'cloudy';
+                else if (code >= 45 && code <= 48) weather = 'foggy';
                 else if (code >= 51 && code <= 67) weather = 'rain';
                 else if (code >= 71 && code <= 77) weather = 'snow';
                 else if (code >= 95) weather = 'ts';
@@ -650,8 +948,10 @@ class WeatherApp {
                 let offsetHours = Math.round((targetTime - now) / 3600000);
                 if (offsetHours < 0) offsetHours = 0;
 
-                dataseries.push({ timepoint: offsetHours, temp2m: max, weather });
-                dataseries.push({ timepoint: offsetHours + 6, temp2m: min, weather });
+                const rain_prob = typeof rainProb === 'number' ? rainProb : undefined;
+                const wind_max = typeof windMax === 'number' ? windMax : undefined;
+                dataseries.push({ timepoint: offsetHours, temp2m: max, weather, rain_prob, wind_max });
+                dataseries.push({ timepoint: offsetHours + 6, temp2m: min, weather, rain_prob, wind_max });
             });
         }
         return { dataseries };
@@ -676,100 +976,18 @@ class WeatherApp {
         if (!response.ok) {
             const error = new Error(`API Error: HTTP ${response.status}`);
             error.status = response.status;
-            error.retryable = response.status >= 500 || response.status === 0;
+
+            // B5: el Service Worker responde 503 con X-SW-Offline cuando no
+            // hay red. Reintentar contra esa respuesta sintética (o estando
+            // navigator.onLine=false) solo quema ~3s de backoff — ir directo
+            // al fallback local (IndexedDB).
+            const isOffline = response.headers.get('X-SW-Offline') === 'true'
+                || navigator.onLine === false;
+            error.retryable = !isOffline && (response.status >= 500 || response.status === 0);
             throw error;
         }
 
         return await response.json();
-    }
-
-    #processForecastData(series, city) {
-        // Guard: API returned null/undefined dataseries
-        if (!Array.isArray(series) || series.length === 0) {
-            console.warn('API returned empty or invalid dataseries');
-            return [];
-        }
-
-        const tz = city.timezone || 'UTC';
-        const todayStr = new Date().toLocaleString('en-US', { timeZone: tz });
-        const today = new Date(todayStr);
-
-        const getDateFromOffset = (offsetHours) => {
-            const date = new Date(today.getTime() + offsetHours * 60 * 60 * 1000);
-
-            const formatterDate = new Intl.DateTimeFormat('es-ES', {
-                timeZone: tz, day: 'numeric', month: 'short'
-            });
-            const formatterDay = new Intl.DateTimeFormat('es-ES', {
-                timeZone: tz, weekday: 'long'
-            });
-            const formatterKey = new Intl.DateTimeFormat('en-CA', {
-                timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit'
-            }); // en-CA gives YYYY-MM-DD
-
-            return {
-                key: formatterKey.format(date),
-                dayName: formatterDay.format(date),
-                fullDate: formatterDate.format(date)
-            };
-        };
-
-        // STEP 1: Group raw API points into daily buckets (pure aggregation)
-        const dailyData = {};
-        series.forEach(point => {
-            const { key, dayName, fullDate } = getDateFromOffset(point.timepoint);
-            if (!dailyData[key]) dailyData[key] = { dayName, date: fullDate, temps: [], weathers: [] };
-
-            // Filter invalid temperatures: -9999 sentinel, null, undefined
-            if (point.temp2m !== -9999 && point.temp2m !== null && point.temp2m !== undefined) {
-                dailyData[key].temps.push(point.temp2m);
-            }
-
-            // Filter null/undefined weather codes
-            if (point.weather) {
-                dailyData[key].weathers.push(point.weather);
-            }
-        });
-
-        // STEP 2: Normalize — apply fallbacks AFTER all chunks are processed
-        const days = Object.values(dailyData).slice(0, 7);
-        days.forEach(day => {
-            if (day.temps.length === 0) day.temps.push(18);
-            if (day.weathers.length === 0) day.weathers.push('clear');
-        });
-
-        // STEP 3: Reduce to daily summaries
-        return days.map(day => {
-            const maxTemp = Math.max(...day.temps);
-            const minTemp = Math.min(...day.temps);
-
-            // Determine dominant weather via frequency count
-            const weatherCounts = day.weathers.reduce((acc, curr) => {
-                acc[curr] = (acc[curr] || 0) + 1;
-                return acc;
-            }, {});
-            const dominantWeather = Object.keys(weatherCounts)
-                .reduce((a, b) => weatherCounts[a] > weatherCounts[b] ? a : b);
-
-            const safeWeather = dominantWeather.replace('day', '').replace('night', '');
-
-            return {
-                dayName: day.dayName,
-                date: day.date,
-                max: maxTemp,
-                min: minTemp,
-                weather: safeWeather,
-                ...(APP_CONFIG.WEATHER_MAP[safeWeather] || APP_CONFIG.WEATHER_MAP['clear'])
-            };
-        });
-    }
-
-    #validateForecastData(forecasts) {
-        return forecasts.map(day => {
-            if (isNaN(day.max) || day.max === null) day.max = 20;
-            if (isNaN(day.min) || day.min === null) day.min = 15;
-            return day;
-        });
     }
 
     #renderForecast(forecasts) {
@@ -802,38 +1020,45 @@ class WeatherApp {
                 <div class="flex flex-col md:flex-row items-center justify-between w-full h-full relative z-10 gap-8">
                     <!-- Data Column -->
                     <div class="w-full md:w-1/2 flex flex-col justify-center items-start">
-                        <div class="flex items-center gap-3 mb-6">
-                            <span class="px-3 py-1.5 bg-blue-500/10 border border-blue-500/20 rounded-full text-blue-400 text-[10px] font-bold uppercase tracking-[0.2em]">
+                        <div class="flex items-center gap-3 mb-6 flex-wrap">
+                            <span class="px-3 py-1.5 bg-accent-dim rounded-full text-accent-strong text-[10px] font-bold uppercase tracking-[0.2em]">
                                 Ahora en ${safeCity}
                             </span>
-                            <span class="text-white/30 text-sm font-light">${safeDate}</span>
+                            <span class="text-ink-faint text-sm font-light">${safeDate}</span>
                         </div>
-                        
-                        <h2 class="temp-display text-7xl md:text-[8rem] font-light tracking-tighter text-white mb-2 leading-none">
-                            ${safeMax}<span class="text-4xl md:text-5xl text-white/40 align-top">°</span>
+
+                        <h2 class="temp-display text-7xl md:text-[8rem] text-ink mb-2 leading-none">
+                            ${safeMax}<span class="text-4xl md:text-5xl text-ink-faint align-top">°</span>
                         </h2>
 
-                        
-                        <div class="text-lg md:text-xl text-blue-300 font-light mb-8 text-lift capitalize tracking-wide">
+                        <div class="text-lg md:text-xl text-accent-strong font-serif italic mb-8 capitalize tracking-wide">
                             ${safeDesc}
                         </div>
 
-                        <div class="flex gap-10 text-white/40">
+                        <div class="flex gap-10 border-t border-hairline pt-5 w-full max-w-xs">
                             <div>
-                                <span class="block text-[10px] uppercase tracking-[0.15em] mb-1 font-semibold text-white/50">Mínima</span>
-                                <span class="text-2xl text-white/90 font-light">${safeMin}°</span>
+                                <span class="block text-[10px] uppercase tracking-[0.15em] mb-1 font-semibold text-ink-soft">Mínima</span>
+                                <span class="text-2xl text-ink font-serif">${safeMin}°</span>
                             </div>
                             <div>
-                                <span class="block text-[10px] uppercase tracking-[0.15em] mb-1 font-semibold text-white/50">Prob. Lluvia</span>
-                                <span class="text-2xl text-white/90 font-light">${today.weather.includes('rain') || today.weather.includes('shower') || today.weather.includes('ts') ? '80%' : (today.weather === 'clear' ? '0%' : '30%')}</span>
+                                <span class="block text-[10px] uppercase tracking-[0.15em] mb-1 font-semibold text-ink-soft">Prob. Precip.</span>
+                                <span class="text-2xl text-ink font-serif">${Number.isFinite(today.rainChance) ? today.rainChance : 0}%</span>
                             </div>
+                            ${Number.isFinite(today.windMax) ? `
+                            <div>
+                                <span class="block text-[10px] uppercase tracking-[0.15em] mb-1 font-semibold text-ink-soft">Viento</span>
+                                <span class="text-2xl text-ink font-serif">${Math.round(today.windMax)}<span class="text-sm text-ink-soft"> km/h</span></span>
+                            </div>` : ''}
                         </div>
                     </div>
 
                     <!-- Icon Column -->
                     <div class="w-full md:w-1/2 flex justify-center md:justify-end items-center mt-6 md:mt-0 relative overflow-visible">
-                        <div class="w-56 h-56 md:w-80 md:h-80 lg:w-[28rem] lg:h-[28rem] drop-shadow-[0_0_40px_rgba(255,255,255,0.2)] text-white/90 md:translate-x-4 lg:translate-x-8 flex items-center justify-center">
-                            ${mainSvg.replace('<svg', '<svg style="width: 100% !important; height: 100% !important; min-width: 100%; min-height: 100%;" class="weather-icon-animated"')}
+                        <div class="relative w-56 h-56 md:w-72 md:h-72 lg:w-96 lg:h-96 flex items-center justify-center">
+                            <div class="icon-disc"></div>
+                            <div class="relative z-10 w-[70%] h-[70%] text-accent flex items-center justify-center">
+                                ${mainSvg.replace('<svg', '<svg style="width: 100% !important; height: 100% !important; min-width: 100%; min-height: 100%;" class="weather-icon-animated"')}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -844,7 +1069,7 @@ class WeatherApp {
         const weekMin = Math.min(...upcoming.map(d => d.min));
 
         this.bentoList.innerHTML = upcoming.map((day) => {
-            // Sanitizar valores de cada día del pronóstico
+            // Sanitizar valores de cada día del pronóstico (solo para display)
             const sDate = sanitize(day.date);
             const sDayName = sanitize(day.dayName);
             const sWeather = sanitize(day.weather);
@@ -855,86 +1080,72 @@ class WeatherApp {
             const sMax = sanitize(day.max, 'number');
             const sMin = sanitize(day.min, 'number');
 
+            // Aritmética SIEMPRE sobre los números crudos ya validados
+            // (sanitize puede devolver '—' y produciría NaN en los estilos)
             const range = weekMax - weekMin || 1;
-            const leftOffset = ((sMin - weekMin) / range) * 100;
-            const barWidth = ((sMax - sMin) / range) * 100;
+            const leftOffset = ((day.min - weekMin) / range) * 100;
+            const barWidth = ((day.max - day.min) / range) * 100;
 
-            // Logic for visual Rain Badge
-            const isRainy = safeRowWeather.includes('rain') || safeRowWeather.includes('shower') || safeRowWeather.includes('ts');
-            const rainBadge = isRainy ? `<div class="mt-1 flex items-center justify-center gap-1 text-[10px] text-sky-400 font-medium whitespace-nowrap"><i class="fas fa-tint"></i><span class="font-mono">80%</span></div>` : '';
+            // Rain badge con probabilidad real derivada de la API
+            const rainChance = Number.isFinite(day.rainChance) ? day.rainChance : 0;
+            const isRainy = rainChance >= 30 || safeRowWeather.includes('rain') || safeRowWeather.includes('shower') || safeRowWeather.includes('ts');
+            const rainBadge = isRainy ? `<div class="mt-1 flex items-center justify-center gap-1 text-[10px] text-sky-700 font-medium whitespace-nowrap"><i class="fas fa-tint"></i><span class="font-mono">${rainChance}%</span></div>` : '';
 
             return `
-            <div class="forecast-row-3d group relative flex flex-col md:flex-row items-center justify-between p-5 mb-4 rounded-2xl transition-all duration-500 cursor-pointer w-full overflow-hidden">
-                
-                <!-- Background & Glass Layers -->
-                <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-2xl z-0 transition-opacity duration-500 group-hover:bg-slate-800/60"></div>
-                <div class="absolute inset-0 bg-gradient-to-br from-white/[0.08] to-transparent z-[1] pointer-events-none"></div>
-                <!-- Top Light Edge & Bottom Shadow Edge -->
-                <div class="absolute inset-0 border-t border-white/[0.15] border-b border-black/50 rounded-2xl z-[2] pointer-events-none mix-blend-overlay"></div>
-                <!-- Cinematic Grain Texture -->
-                <div class="absolute inset-0 opacity-[0.15] z-[3] pointer-events-none mix-blend-overlay" style="background-image: url('data:image/svg+xml,%3Csvg viewBox=\\"0 0 200 200\\" xmlns=\\"http://www.w3.org/2000/svg\\"%3E%3Cfilter id=\\"noiseFilter\\"%3E%3CfeTurbulence type=\\"fractalNoise\\" baseFrequency=\\"0.8\\" numOctaves=\\"3\\" stitchTiles=\\"stitch\\"/%3E%3C/filter%3E%3Crect width=\\"100%\\" height=\\"100%\\" filter=\\"url(%23noiseFilter)\\"/%3E%3C/svg%3E');"></div>
+            <div class="forecast-row-3d group relative flex flex-col md:flex-row items-center justify-between px-6 py-5 transition-all duration-300 cursor-pointer w-full">
 
                 <!-- Content Container -->
                 <div class="relative z-10 flex w-full items-center justify-between">
                     <!-- Date & Day -->
                     <div class="flex items-center gap-4 w-[40%] md:w-[30%] flex-shrink-0">
-                        <div class="flex flex-col items-center justify-center bg-white/5 border border-white/10 rounded-xl w-12 h-12 shadow-inner group-hover:bg-white/10 transition-colors">
-                            <span class="text-white/40 font-mono text-[10px] tracking-widest uppercase mb-0.5">Día</span>
-                            <span class="text-white/90 font-mono font-bold text-lg leading-none">${sDate.split(' ')[0]}</span>
+                        <div class="date-block flex flex-col items-center justify-center rounded-xl w-12 h-12 transition-colors text-ink">
+                            <span class="text-ink-faint text-[9px] tracking-widest uppercase mb-0.5 font-sans font-semibold">Día</span>
+                            <span class="font-bold text-lg leading-none">${sDate.split(' ')[0]}</span>
                         </div>
                         <div class="flex flex-col">
-                            <span class="text-base md:text-xl font-semibold font-serif text-white uppercase tracking-wider truncate group-hover:text-blue-300 transition-colors duration-300 drop-shadow-md">${sDayName.split(' ')[0]}</span>
-                            <span class="text-[9px] md:text-[10px] text-blue-200/60 uppercase tracking-[0.2em] mt-0.5 truncate max-w-[100px] md:max-w-[150px] font-medium">${weatherDesc}</span>
+                            <span class="text-base md:text-xl font-serif text-ink capitalize tracking-tight truncate group-hover:text-accent transition-colors duration-300">${sDayName.split(' ')[0]}</span>
+                            <span class="text-[9px] md:text-[10px] text-ink-faint uppercase tracking-[0.2em] mt-0.5 truncate max-w-[100px] md:max-w-[150px] font-medium">${weatherDesc}</span>
                         </div>
                     </div>
-                    
+
                     <!-- Icon & Probability -->
                     <div class="flex flex-col items-center justify-center w-[20%] md:w-[20%] flex-shrink-0 relative">
-                        <!-- Holographic Glow behind icon -->
-                        <div class="absolute inset-0 bg-blue-500/10 blur-xl rounded-full scale-50 group-hover:scale-100 transition-transform duration-500 opacity-0 group-hover:opacity-100 hidden md:block"></div>
-                        <div class="w-10 h-10 md:w-14 md:h-14 text-white/90 drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] group-hover:scale-110 group-hover:-translate-y-1 transition-all duration-300 relative z-10">
+                        <div class="w-10 h-10 md:w-12 md:h-12 text-ink-soft group-hover:text-accent group-hover:scale-110 transition-all duration-300 relative z-10">
                             ${rowSvg}
                         </div>
                         ${rainBadge}
                     </div>
 
-                    <!-- Volumetric Temperature Bar -->
+                    <!-- Barra de amplitud térmica -->
                     <div class="flex items-center justify-end gap-3 md:gap-5 w-[40%] md:w-[50%] flex-shrink-0">
-                        <span class="text-sm md:text-base font-semibold text-white/50 w-8 text-right drop-shadow-sm">${sMin}°</span>
-                        
-                        <!-- Liquid Thermo Container -->
-                        <div class="liquid-thermo-container flex-grow max-w-[140px] md:max-w-[220px] h-2.5 md:h-3.5 bg-slate-950/80 rounded-full overflow-hidden relative shadow-[inset_0_2px_4px_rgba(0,0,0,0.6),0_1px_1px_rgba(255,255,255,0.05)] border border-black/40">
-                            <!-- Inner Glass Reflection -->
-                            <div class="absolute inset-0 rounded-full border-t border-white/10 z-20 pointer-events-none"></div>
-                            
-                            <!-- Neon Liquid Tube -->
-                            <div class="liquid-thermo-bar absolute h-full rounded-full transition-all duration-700 ease-out z-10" 
+                        <span class="text-sm md:text-base font-medium text-ink-faint w-8 text-right">${sMin}°</span>
+
+                        <div class="liquid-thermo-container flex-grow max-w-[140px] md:max-w-[220px] h-2.5 md:h-3 rounded-full overflow-hidden relative">
+                            <div class="liquid-thermo-bar absolute h-full rounded-full transition-all duration-700 ease-out z-10"
                                  style="left: ${leftOffset}%; width: ${Math.max(barWidth, 8)}%;">
-                                <!-- Gradient core -->
-                                <div class="absolute inset-0 bg-gradient-to-r ${isRainy ? 'from-indigo-500 to-cyan-400' : 'from-blue-500 via-sky-400 to-amber-400'} opacity-90 blur-[1px]"></div>
-                                <!-- Bright center streak (Neon effect) -->
-                                <div class="absolute inset-y-1/4 inset-x-0 bg-white/40 rounded-full blur-[0.5px]"></div>
-                                <!-- Flare indicator -->
-                                <div class="liquid-flare absolute right-0 top-0 bottom-0 w-2 bg-white/80 rounded-full blur-[1px] shadow-[0_0_8px_rgba(255,255,255,0.8)]"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r ${isRainy ? 'from-indigo-400 to-sky-400' : 'from-sky-500 to-amber-400'} opacity-90"></div>
+                                <div class="liquid-flare absolute right-0 top-0 bottom-0 w-1.5 rounded-full"></div>
                             </div>
                         </div>
-                        
-                        <span class="text-sm md:text-lg font-bold text-white w-8 text-left drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]">${sMax}°</span>
+
+                        <span class="text-sm md:text-lg font-bold text-ink w-8 text-left font-serif">${sMax}°</span>
                     </div>
                 </div>
             </div>
             `;
         }).join('');
 
-        // Staggered entrance — cinematic cascade from below
+        // Staggered entrance — cinematic cascade from below.
+        // B7: clearProps al terminar — el transform inline que deja GSAP
+        // anularía el :hover CSS de las filas (translateX en hover).
         gsap.fromTo('#bento-main > div',
             { opacity: 0, y: 40, scale: 0.97, filter: 'blur(8px)' },
-            { opacity: 1, y: 0, scale: 1, filter: 'blur(0px)', duration: 1.4, ease: "expo.out" }
+            { opacity: 1, y: 0, scale: 1, filter: 'blur(0px)', duration: 1.4, ease: "expo.out", clearProps: 'transform,filter' }
         );
 
         gsap.fromTo('.forecast-row-3d',
             { opacity: 0, y: 20, filter: 'blur(6px)' },
-            { opacity: 1, y: 0, filter: 'blur(0px)', stagger: 0.1, duration: 0.8, ease: "power3.out", delay: 0.4 }
+            { opacity: 1, y: 0, filter: 'blur(0px)', stagger: 0.1, duration: 0.8, ease: "power3.out", delay: 0.4, clearProps: 'transform,filter' }
         );
     }
 
@@ -946,8 +1157,13 @@ class WeatherApp {
     #applyWeatherTheme(weather) {
         const theme = APP_CONFIG.WEATHER_THEMES[weather] || APP_CONFIG.WEATHER_THEMES['pcloudy'];
         const root = document.documentElement.style;
+        const dark = window.matchMedia
+            && window.matchMedia('(prefers-color-scheme: dark)').matches;
 
         root.setProperty('--brand-accent', theme.accent);
+        // Variante AA para texto pequeño: oscurecida en claro, aclarada en oscuro
+        root.setProperty('--brand-accent-text',
+            dark ? (theme.textDark || theme.accent) : (theme.text || theme.accent));
         root.setProperty('--brand-accent-hover', theme.hover);
         root.setProperty('--brand-dim', theme.dim);
         root.setProperty('--brand-glow', theme.glow);
@@ -977,13 +1193,14 @@ class WeatherApp {
             // Quick fade-out for a crisp click feel
             gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.02);
             osc.stop(ctx.currentTime + 0.03);
-        } catch (e) {
+        } catch {
             // Web Audio not supported — fail silently
         }
     }
 
     showItinerary() {
-        if (!this.#currentForecast) return;
+        // B11: [] es truthy — sin días no hay itinerario que mostrar
+        if (!this.#currentForecast?.length) return;
 
         const plan = this.#itinerary.generate(this.#currentCityName, this.#currentForecast);
         document.getElementById('modal-city-name').textContent = this.#currentCityName;
@@ -999,18 +1216,18 @@ class WeatherApp {
             const sEvening = sanitize(day.plan.evening);
 
             return `
-                <div class="border-l-2 border-blue-500/30 pl-4 py-2 hover:bg-white/5 transition-colors rounded-r-lg">
+                <div class="border-l-2 pl-4 py-2 hover:bg-paper transition-colors rounded-r-lg" style="border-color: var(--brand-accent)">
                 <div class="flex items-center justify-between mb-2">
-                    <h4 class="text-blue-400 font-semibold font-serif text-xl">${sDate}</h4>
-                    <div class="flex items-center gap-2 text-sm opacity-70">
-                        <i class="fas ${sIcon}"></i>
+                    <h4 class="text-accent-strong font-semibold font-serif text-xl capitalize">${sDate}</h4>
+                    <div class="flex items-center gap-2 text-sm text-ink-soft">
+                        <i class="fas ${sIcon} text-accent"></i>
                         <span>${sTemp}° ${sCond}</span>
                     </div>
                 </div>
-                <div class="space-y-2 text-sm">
-                    <p><strong class="text-blue-200">Mañana:</strong> ${sMorning}</p>
-                    <p><strong class="text-blue-200">Tarde:</strong> ${sAfternoon}</p>
-                    <p><strong class="text-blue-200">Noche:</strong> ${sEvening}</p>
+                <div class="space-y-2 text-sm text-ink-soft">
+                    <p><strong class="text-ink font-semibold">Mañana:</strong> ${sMorning}</p>
+                    <p><strong class="text-ink font-semibold">Tarde:</strong> ${sAfternoon}</p>
+                    <p><strong class="text-ink font-semibold">Noche:</strong> ${sEvening}</p>
                 </div>
             </div>
                 `;
@@ -1019,18 +1236,36 @@ class WeatherApp {
         this.toggleModal(true);
     }
 
+    /**
+     * El scroll del body se bloquea si el modal O el mapa expandido están
+     * activos. Sincronizar por estado combinado evita que cerrar uno
+     * desbloquee el scroll mientras el otro sigue abierto.
+     */
+    #syncBodyScrollLock() {
+        const mapExpanded = document.getElementById('map-wrapper')?.classList.contains('map-expanded');
+        const modalOpen = !this.modal.classList.contains('hidden');
+        document.body.classList.toggle('modal-open', !!mapExpanded || modalOpen);
+    }
+
     toggleModal(show) {
         if (show) {
+            this.lastFocusedElement = document.activeElement;
             this.modal.classList.remove('hidden');
-            document.body.classList.add('modal-open');
+            this.#syncBodyScrollLock();
             gsap.to(this.modalContent, { scale: 1, opacity: 1, duration: 0.4, ease: 'power2.out' });
+            // Mover el foco dentro del diálogo (a11y)
+            this.closeModalBtn.focus();
         } else {
-            document.body.classList.remove('modal-open');
             gsap.to(this.modalContent, {
                 scale: 0.95, opacity: 0, duration: 0.3, onComplete: () => {
                     this.modal.classList.add('hidden');
+                    this.#syncBodyScrollLock();
                 }
             });
+            // Devolver el foco al elemento que abrió el modal (a11y)
+            if (this.lastFocusedElement && typeof this.lastFocusedElement.focus === 'function') {
+                this.lastFocusedElement.focus();
+            }
         }
     }
 
@@ -1063,7 +1298,7 @@ class WeatherApp {
 
             // Inject Skeleton into bento list
             this.bentoList.innerHTML = Array.from({ length: 5 }, (_, i) => `
-                <div class="flex items-center justify-between py-4 md:py-5 px-6 border-b border-white/5 transition-all duration-300 w-full" style="animation-delay: ${i * 0.1}s">
+                <div class="flex items-center justify-between py-4 md:py-5 px-6 border-b border-hairline transition-all duration-300 w-full" style="animation-delay: ${i * 0.1}s">
                     <div class="flex items-center gap-3 md:gap-4 w-[35%] md:w-[30%] flex-shrink-0">
                         <div class="skeleton-bone h-4 w-5 md:w-6 rounded"></div>
                         <div class="flex flex-col gap-1 w-full max-w-[120px]">
@@ -1109,22 +1344,28 @@ class WeatherApp {
 
             this.errorState.innerHTML = `
                     <div class="flex flex-col items-center justify-center p-12 text-center">
-                    <div class="w-20 h-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mb-6">
-                        <i class="fas ${isOffline ? 'fa-wifi' : 'fa-satellite-dish'} text-3xl ${isOffline ? 'text-white/30' : 'text-red-400/80'}"></i>
+                    <div class="w-20 h-20 rounded-full bg-paper border border-hairline flex items-center justify-center mb-6">
+                        <i class="fas ${isOffline ? 'fa-wifi' : 'fa-satellite-dish'} text-3xl ${isOffline ? 'text-ink-faint' : 'text-red-600'}"></i>
                     </div>
-                    <h3 class="text-xl font-medium text-white mb-2 font-serif">
+                    <h3 class="text-xl font-medium text-ink mb-2 font-serif">
                         ${isOffline ? 'Sin Conexión al Satélite' : 'Interferencia de Señal'}
                     </h3>
-                    <p class="text-white/40 text-sm max-w-md mb-6 leading-relaxed">
+                    <p class="text-ink-soft text-sm max-w-md mb-6 leading-relaxed">
                         ${isOffline
                     ? 'No hay conexión a internet. Conéctate a una red y vuelve a intentarlo.'
                     : 'No pudimos conectar con los servicios meteorológicos. Por favor, inténtalo de nuevo.'}
                     </p>
-                    <button onclick="document.querySelector('#city-trigger').click()" class="btn-luxury-outline text-sm">
+                    <button id="error-retry-btn" class="btn-luxury-outline text-sm">
                         <i class="fas fa-rotate-right mr-2"></i> Reintentar
                     </button>
                 </div>
                 `;
+
+            // Listener explícito (sin onclick inline — compatible con CSP)
+            this.errorState.querySelector('#error-retry-btn').addEventListener('click', () => {
+                const lastCity = this.#cache.getSession('lastCity');
+                this.handleCityChange(lastCity !== null ? lastCity : 0);
+            });
 
             this.errorState.classList.remove('hidden');
             gsap.fromTo(this.errorState,
@@ -1143,7 +1384,7 @@ class WeatherApp {
             if (res.ok) {
                 this.#dynamicDeals = await res.json();
             } else throw new Error();
-        } catch (e) {
+        } catch {
             this.#dynamicDeals = APP_CONFIG.CITY_DEALS;
         }
     }
@@ -1155,11 +1396,17 @@ class WeatherApp {
             return;
         }
 
+        // Sanitizar: deals.json llega por fetch y podría ser manipulado
+        const safeTitle = sanitize(deal.title);
+        const safePrice = sanitize(deal.price);
+        const safeImage = safeUrl(deal.image, '');
+        const safeLink = safeUrl(deal.link, '#');
+
         gsap.to(this.offerContainer, {
             opacity: 0, duration: 0.3, onComplete: () => {
                 this.offerContainer.innerHTML = `
                 <div class="offer-card flex flex-col md:flex-row items-center w-full group my-6 md:my-10">
-                    <img src="${deal.image}" alt="${deal.title}" class="offer-card-bg" />
+                    ${safeImage ? `<img src="${safeImage}" alt="${safeTitle}" class="offer-card-bg" />` : ''}
                         <div class="offer-card-overlay pointer-events-none"></div>
 
                         <div class="offer-card-content flex flex-col md:flex-row items-center justify-between w-full p-10 md:p-20 text-white gap-10 md:gap-16 w-full">
@@ -1168,16 +1415,16 @@ class WeatherApp {
                                     <div class="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
                                     <span class="text-blue-400 font-bold uppercase tracking-[0.4em] text-[11px] md:text-xs">Plan Corporativo</span>
                                 </div>
-                                <h3 class="text-4xl md:text-6xl font-serif italic font-medium mb-6 tracking-tight text-white leading-tight">${deal.title}</h3>
+                                <h3 class="text-4xl md:text-6xl font-serif italic font-medium mb-6 tracking-tight text-white leading-tight">${safeTitle}</h3>
                                 <p class="text-white/60 font-light text-lg md:text-xl max-w-xl leading-relaxed">Conexiones directas, suites ejecutivas y eficiencia pura para el viajero de negocios.</p>
                             </div>
 
                             <div class="flex flex-col items-center md:items-end gap-6 shrink-0 md:w-1/3 md:pl-16 border-t md:border-t-0 md:border-l border-white/10 pt-8 md:pt-0">
                                 <div class="text-center md:text-right">
                                     <span class="text-[10px] md:text-sm text-white/30 block uppercase tracking-[0.4em] font-bold mb-4">Tarifa de Gestión</span>
-                                    <span class="text-7xl md:text-8xl lg:text-[8rem] font-sans font-thin text-white tracking-tighter leading-none">${deal.price}</span>
+                                    <span class="text-7xl md:text-8xl lg:text-[8rem] font-sans font-thin text-white tracking-tighter leading-none">${safePrice}</span>
                                 </div>
-                                <a href="${deal.link}" target="_blank" rel="noopener noreferrer" class="btn-luxury w-full md:w-auto text-center mt-6 text-base md:text-lg px-12 py-5 tracking-widest uppercase font-semibold relative z-50">
+                                <a href="${safeLink}" target="_blank" rel="noopener noreferrer" class="btn-luxury w-full md:w-auto text-center mt-6 text-base md:text-lg px-12 py-5 tracking-widest uppercase font-semibold relative z-50">
                                     <span>Iniciar Proceso</span>
                                 </a>
                             </div>
@@ -1200,23 +1447,81 @@ class WeatherApp {
 
         let targetX = 0, targetY = 0;
         let currentX = 0, currentY = 0;
+        let rafId = null;
 
-        document.addEventListener('mousemove', (e) => {
-            targetX = (e.clientX / window.innerWidth - 0.5) * 30;
-            targetY = (e.clientY / window.innerHeight - 0.5) * 20;
-        });
-
+        // El bucle rAF solo corre mientras hay movimiento pendiente;
+        // se detiene al converger para no quemar CPU en reposo.
         const animate = () => {
             currentX += (targetX - currentX) * 0.05;
             currentY += (targetY - currentY) * 0.05;
             meshBg.style.transform = `translate(${currentX}px, ${currentY}px)`;
-            requestAnimationFrame(animate);
+
+            if (Math.abs(targetX - currentX) > 0.05 || Math.abs(targetY - currentY) > 0.05) {
+                rafId = requestAnimationFrame(animate);
+            } else {
+                rafId = null;
+            }
         };
-        requestAnimationFrame(animate);
+
+        document.addEventListener('mousemove', (e) => {
+            targetX = (e.clientX / window.innerWidth - 0.5) * 30;
+            targetY = (e.clientY / window.innerHeight - 0.5) * 20;
+            if (rafId === null) rafId = requestAnimationFrame(animate);
+        });
     }
 }
 
-// El Service Worker se registra en index.html usando requestIdleCallback
 document.addEventListener('DOMContentLoaded', () => {
     new WeatherApp();
 });
+
+// ═══════════════════════════════════════════════════════════════
+// Registro del Service Worker — diferido tras `load` con
+// requestIdleCallback para no competir con el LCP del hero.
+// Flujo de actualización: la versión nueva queda en 'waiting', se
+// notifica con un toast accionable y solo se activa si el usuario
+// acepta (SKIP_WAITING → controllerchange → reload).
+// ═══════════════════════════════════════════════════════════════
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        const registerSW = () => {
+            navigator.serviceWorker.register('./service-worker.js')
+                .then((registration) => {
+                    const notifyUpdate = (worker) => {
+                        window.dispatchEvent(new CustomEvent('sw-update-available', {
+                            detail: { worker }
+                        }));
+                    };
+
+                    // ¿Ya había una versión esperando de una visita anterior?
+                    if (registration.waiting && navigator.serviceWorker.controller) {
+                        notifyUpdate(registration.waiting);
+                    }
+
+                    registration.addEventListener('updatefound', () => {
+                        const newWorker = registration.installing;
+                        if (!newWorker) return;
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                notifyUpdate(newWorker);
+                            }
+                        });
+                    });
+                })
+                .catch(err => console.warn('[PWA] Registro de SW fallido:', err));
+        };
+        if ('requestIdleCallback' in window) {
+            requestIdleCallback(registerSW, { timeout: 3000 });
+        } else {
+            setTimeout(registerSW, 1000);
+        }
+    });
+
+    // Cuando el SW nuevo toma el control tras SKIP_WAITING → recargar una vez
+    let hasRefreshed = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (hasRefreshed) return;
+        hasRefreshed = true;
+        window.location.reload();
+    });
+}

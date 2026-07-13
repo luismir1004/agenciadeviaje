@@ -3,7 +3,7 @@
  * Handles LocalStorage persistence with TTL (Time To Live) for weather data,
  * and session persistence (no TTL) for UI state like last selected city.
  */
-class CacheManager {
+export class CacheManager {
     #ttl;
 
     /**
@@ -79,15 +79,23 @@ class CacheManager {
         try {
             const raw = localStorage.getItem(`session_${key}`);
             return raw !== null ? JSON.parse(raw) : null;
-        } catch (e) {
+        } catch {
             return null;
         }
     }
 
     /**
-     * Clear all cache
+     * Clear only this app's cache/session keys.
+     * Never wipes the whole origin storage (other features/apps
+     * on the same origin must not be affected).
      */
     clear() {
-        localStorage.clear();
+        const OWN_PREFIXES = ['weather_', 'session_'];
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+            const key = localStorage.key(i);
+            if (key && OWN_PREFIXES.some(p => key.startsWith(p))) {
+                localStorage.removeItem(key);
+            }
+        }
     }
 }

@@ -1,40 +1,109 @@
 /* ═══════════════════════════════════════════════════════════════════
-   NextGen Europa — Native Dark Glass Design System
-   Inspired by macOS Ventura / iOS 17 Weather App
+   NextGen Europa — "Meridian Editorial" Design System
+   Papel · Tinta · Tipografía display · Retícula suiza
+   Acentos dinámicos por clima vía --brand-accent (Config.js)
    ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Fuentes self-hosted (variables, subset latin) ─────────────────
+   Sin Google Fonts: menos latencia, sin IP-logging de terceros,
+   y cacheables por el propio Service Worker. */
+@font-face {
+    font-family: 'Fraunces';
+    src: url('fonts/fraunces-latin-opsz-normal.woff2') format('woff2-variations');
+    font-weight: 100 900;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Fraunces';
+    src: url('fonts/fraunces-latin-opsz-italic.woff2') format('woff2-variations');
+    font-weight: 100 900;
+    font-style: italic;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Inter';
+    src: url('fonts/inter-latin-wght-normal.woff2') format('woff2-variations');
+    font-weight: 100 900;
+    font-style: normal;
+    font-display: swap;
+}
 
 /* ── Design Tokens ────────────────────────────────────────────────── */
 :root {
-    /* Midnight Palette */
-    --midnight-base: #0A0F1E;
-    --midnight-depth: #0F172A;
-    --midnight-surface: rgba(15, 23, 42, 0.55);
-    --midnight-elevated: rgba(30, 41, 59, 0.5);
+    /* Paper & Ink */
+    --paper: #F6F5F1;
+    --paper-deep: #EFEDE7;
+    --surface: #FFFFFF;
+    --ink: #17191E;
+    --ink-soft: #565B64;
+    --ink-faint: #6B6E74;  /* AA 4.69:1 sobre papel (antes #9BA0A8 = 2.41:1) */
+    --hairline: #E6E3DB;
+    --hairline-strong: #D8D4CA;
 
-    /* Glass System - Physical Realism */
-    --glass-bg: rgba(255, 255, 255, 0.02);
-    --glass-bg-hover: rgba(255, 255, 255, 0.04);
-    --glass-border-subtle: rgba(255, 255, 255, 0.04);
-    --glass-border-specular: rgba(255, 255, 255, 0.2);
-    --glass-highlight: rgba(255, 255, 255, 0.03);
-    --glass-blur: 24px;
+    /* Canales RGB para las utilidades Tailwind (soportan /opacidad) */
+    --paper-rgb: 246 245 241;
+    --surface-rgb: 255 255 255;
+    --ink-rgb: 23 25 30;
+    --ink-soft-rgb: 86 91 100;
+    --ink-faint-rgb: 107 110 116;
+    --hairline-rgb: 230 227 219;
 
-    /* Accent: Cobalt Blue */
-    --brand-accent: #3B82F6;
-    --brand-accent-hover: #60A5FA;
-    --brand-dim: rgba(59, 130, 246, 0.12);
-    --brand-glow: rgba(59, 130, 246, 0.25);
+    /* Accent dinámico (lo muta #applyWeatherTheme según el clima).
+       --brand-accent-text es la variante oscurecida que cumple AA (>=4.5:1)
+       para texto pequeño; el accent base queda para gráficos y display. */
+    --brand-accent: #2563EB;
+    --brand-accent-text: #2563EB;
+    --brand-accent-hover: #1D4ED8;
+    --brand-dim: rgba(37, 99, 235, 0.10);
+    --brand-glow: rgba(37, 99, 235, 0.15);
 
-    /* Shadows (Deep, layered, volumetric) */
-    --shadow-flat: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow-elite: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 0 var(--glass-border-specular);
-    --shadow-floating: 0 30px 60px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.3);
-    --shadow-glow: 0 0 40px var(--brand-glow), 0 0 80px rgba(59, 130, 246, 0.08);
+    /* Skeleton shimmer (token-driven para soportar modo oscuro) */
+    --skeleton-a: rgba(23, 25, 30, 0.05);
+    --skeleton-b: rgba(23, 25, 30, 0.10);
+
+    /* Sombras — suaves, difusas, de papel */
+    --shadow-flat: 0 1px 2px rgba(23, 25, 30, 0.05);
+    --shadow-elite: 0 1px 2px rgba(23, 25, 30, 0.04), 0 16px 40px -16px rgba(23, 25, 30, 0.12);
+    --shadow-floating: 0 2px 4px rgba(23, 25, 30, 0.05), 0 32px 64px -24px rgba(23, 25, 30, 0.18);
+    --shadow-glow: 0 8px 32px -8px var(--brand-glow);
+}
+
+/* ── Modo oscuro (tokens AA verificados: ink 14.6:1, ink-soft 7.4:1,
+      ink-faint 6.2:1 sobre superficie) — los acentos de texto los
+      resuelve #applyWeatherTheme con la variante textDark por tema. ── */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --paper: #111318;
+        --paper-deep: #0B0D11;
+        --surface: #191C22;
+        --ink: #ECEDEF;
+        --ink-soft: #A6ABB5;
+        --ink-faint: #969CA6;
+        --hairline: #2A2E36;
+        --hairline-strong: #383D47;
+
+        --paper-rgb: 17 19 24;
+        --surface-rgb: 25 28 34;
+        --ink-rgb: 236 237 239;
+        --ink-soft-rgb: 166 171 181;
+        --ink-faint-rgb: 150 156 166;
+        --hairline-rgb: 42 46 54;
+
+        --skeleton-a: rgba(236, 237, 239, 0.06);
+        --skeleton-b: rgba(236, 237, 239, 0.12);
+
+        --shadow-flat: 0 1px 2px rgba(0, 0, 0, 0.4);
+        --shadow-elite: 0 1px 2px rgba(0, 0, 0, 0.35), 0 16px 40px -16px rgba(0, 0, 0, 0.55);
+        --shadow-floating: 0 2px 4px rgba(0, 0, 0, 0.4), 0 32px 64px -24px rgba(0, 0, 0, 0.7);
+    }
 }
 
 /* ── Base ──────────────────────────────────────────────────────────── */
 html {
-    background-color: var(--midnight-base);
+    background-color: var(--paper);
     margin: 0;
     padding: 0;
 }
@@ -42,54 +111,47 @@ html {
 body {
     margin: 0;
     padding: 0;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
-    background-color: var(--midnight-base);
-    color: rgba(255, 255, 255, 0.9);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    background-color: var(--paper);
+    color: var(--ink);
     min-height: 100vh;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.011em;
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     transition: color 0.8s ease;
     scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+    scrollbar-color: var(--hairline-strong) transparent;
     overflow-x: hidden;
 }
 
-/* ── Mesh Gradient Background ─────────────────────────────────────── */
+::selection {
+    background: var(--brand-accent);
+    color: var(--paper);
+}
+
+/* ── Fondo atmosférico (tinte de acento muy sutil sobre papel) ────── */
 #mesh-bg {
     position: fixed;
     inset: 0;
     z-index: 0;
     pointer-events: none;
     background:
-        radial-gradient(ellipse 80% 60% at 20% 30%, rgba(59, 130, 246, 0.08) 0%, transparent 60%),
-        radial-gradient(ellipse 60% 80% at 80% 70%, rgba(124, 58, 237, 0.06) 0%, transparent 60%),
-        radial-gradient(ellipse 50% 40% at 50% 50%, rgba(6, 182, 212, 0.04) 0%, transparent 50%);
-    animation: mesh-shift 20s ease-in-out infinite alternate;
+        radial-gradient(ellipse 70% 50% at 15% 10%, var(--brand-dim) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 60% at 90% 85%, var(--brand-dim) 0%, transparent 55%);
+    opacity: 0.7;
+    animation: mesh-shift 24s ease-in-out infinite alternate;
     will-change: transform;
-    transition: transform 0.3s ease-out;
+    transition: transform 0.3s ease-out, background 0.8s ease;
 }
 
 @keyframes mesh-shift {
-    0% {
-        transform: scale(1) translate(0, 0);
-    }
-
-    33% {
-        transform: scale(1.05) translate(-2%, 1%);
-    }
-
-    66% {
-        transform: scale(1.02) translate(1%, -1%);
-    }
-
-    100% {
-        transform: scale(1) translate(0, 0);
-    }
+    0% { transform: scale(1) translate(0, 0); }
+    50% { transform: scale(1.04) translate(-1.5%, 1%); }
+    100% { transform: scale(1) translate(0, 0); }
 }
 
-/* ── Scrollbar (macOS native feel) ────────────────────────────────── */
+/* ── Scrollbar ────────────────────────────────────────────────────── */
 ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -99,175 +161,220 @@ body {
     background: transparent;
 }
 
-/* ── Custom Animations ────────────────────────────────────────────── */
-@keyframes eq {
-    0% {
-        height: 20%;
-    }
-
-    100% {
-        height: 100%;
-    }
-}
-
 ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--hairline-strong);
     border-radius: 20px;
     transition: background 0.3s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.25);
+    background: var(--ink-faint);
 }
 
-/* ── Typography (Editorial / Native) ──────────────────────────────── */
+/* ── Ecualizador de audio ─────────────────────────────────────────── */
+@keyframes eq {
+    0% { height: 20%; }
+    100% { height: 100%; }
+}
+
+/* ── Tipografía editorial ─────────────────────────────────────────── */
 h1,
 h2,
 h3,
 .font-serif {
-    font-family: 'Playfair Display', 'Georgia', serif;
-    font-weight: 400;
-    letter-spacing: -0.03em;
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 480;
+    letter-spacing: -0.02em;
+    font-variation-settings: 'opsz' 72;
 }
 
-strong.font-serif,
-h1.font-bold {
-    font-weight: 700;
-    letter-spacing: -0.04em;
-}
-
-/* Temperature display — ultra editorial */
+/* Display de temperatura — números editoriales gigantes */
 .temp-display {
-    font-family: 'Inter', sans-serif;
-    font-weight: 200;
-    letter-spacing: -0.06em;
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 340;
+    letter-spacing: -0.05em;
     line-height: 0.85;
+    font-variation-settings: 'opsz' 144;
+    font-feature-settings: 'tnum';
 }
 
-/* ── Leaflet Theme Overrides (Ultra-Realistic) ────────────────────── */
+/* Etiquetas small-caps suizas */
+.eyebrow {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.625rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.28em;
+    color: var(--ink-soft);
+}
+
+.eyebrow--accent {
+    color: var(--brand-accent-text);
+}
+
+/* Regla suiza: encabezado de sección con doble línea */
+.section-rule {
+    border-top: 2px solid var(--ink);
+    padding-top: 0.875rem;
+    position: relative;
+}
+
+.section-rule::after {
+    content: '';
+    position: absolute;
+    top: 4px;
+    left: 0;
+    right: 0;
+    border-top: 1px solid var(--hairline);
+}
+
+/* Índice numerado de sección (01, 02, 03...) */
+.section-index {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--brand-accent-text);
+    font-feature-settings: 'tnum';
+}
+
+/* Utilidades de acento dinámico */
+.text-accent { color: var(--brand-accent); }
+.text-accent-strong { color: var(--brand-accent-text); }
+.bg-accent { background-color: var(--brand-accent); }
+.bg-accent-dim { background-color: var(--brand-dim); }
+.border-accent { border-color: var(--brand-accent); }
+
+/* Legado: text-lift ya no necesita sombra sobre papel */
+.text-lift {
+    text-shadow: none;
+}
+
+/* ── Leaflet ──────────────────────────────────────────────────────── */
 .leaflet-container {
-    background: transparent !important;
+    background: var(--paper-deep) !important;
     font-family: 'Inter', sans-serif;
 }
 
-/* Esconder atribución blanca por defecto que rompe la inmersión */
 .leaflet-control-attribution {
     display: none !important;
 }
 
-/* ── Glass Panel (Core Component) ─────────────────────────────────── */
+/* ── Tarjeta base (antes "glass-panel", ahora tarjeta de papel) ───── */
 .glass-panel {
-    background: var(--glass-bg);
-    /* Frosted texture overlay using internal procedural SVG */
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E");
-    backdrop-filter: blur(var(--glass-blur)) saturate(150%);
-    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
-
-    /* Physical Border Re-fraction (Specular Top, Subtle Bottom) */
-    border: 1px solid var(--glass-border-subtle);
-    border-top: 1px solid var(--glass-border-specular);
-    border-left: 1px solid rgba(255, 255, 255, 0.08);
-
-    border-radius: 1.5rem;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: 1.25rem;
     box-shadow: var(--shadow-elite);
     position: relative;
     overflow: hidden;
-    transition: all 0.5s cubic-bezier(0.2, 1, 0.2, 1);
-}
-
-/* Ambient inner glow */
-.glass-panel::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    box-shadow: inset 0 0 30px rgba(255, 255, 255, 0.01);
-    pointer-events: none;
-    z-index: 1;
-}
-
-.glass-panel::after {
-    display: none;
+    transition: border-color 0.4s ease, box-shadow 0.5s cubic-bezier(0.2, 1, 0.2, 1), transform 0.5s cubic-bezier(0.2, 1, 0.2, 1);
 }
 
 .glass-panel:hover {
-    border-color: rgba(255, 255, 255, 0.08);
-    border-top-color: rgba(255, 255, 255, 0.3);
+    border-color: var(--hairline-strong);
     box-shadow: var(--shadow-floating);
-    background-color: var(--glass-bg-hover);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   HERO SECTION
+   HERO
    ═══════════════════════════════════════════════════════════════════ */
 #hero-section {
     contain: layout paint;
 }
 
 .hero-subtitle {
-    letter-spacing: 0.4em;
-    font-weight: 300;
-    text-shadow: 0 0 30px rgba(59, 130, 246, 0.3);
+    letter-spacing: 0.3em;
+    font-weight: 700;
+    font-family: 'Inter', sans-serif;
 }
 
-.hero-ui {
-    backdrop-filter: blur(24px) saturate(200%);
-    -webkit-backdrop-filter: blur(24px) saturate(200%);
-    background: rgba(15, 23, 42, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+/* Marco editorial de la foto del hero */
+.hero-media-frame {
+    border-radius: 1.5rem;
+    overflow: hidden;
+    border: 1px solid var(--hairline);
     box-shadow: var(--shadow-floating);
-    transition: all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+    background: var(--paper-deep);
+    position: relative;
+}
+
+.hero-media-caption {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10;
+    padding: 1rem 1.25rem;
+    background: linear-gradient(180deg, transparent 0%, rgba(10, 12, 16, 0.55) 100%);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    pointer-events: none;
+}
+
+/* Contenedor del selector — tarjeta clara flotante */
+.hero-ui {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    box-shadow: var(--shadow-elite);
+    transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.3s ease, box-shadow 0.4s ease;
 }
 
 .hero-ui:hover {
-    transform: translateY(-4px);
-    background: rgba(15, 23, 42, 0.65);
-    border-color: rgba(59, 130, 246, 0.3);
-    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(59, 130, 246, 0.15);
+    transform: translateY(-2px);
+    border-color: var(--brand-accent);
+    box-shadow: var(--shadow-floating);
+}
+
+/* Chip de señal en vivo — sin tarjeta, tipográfico */
+.live-chip {
+    border: 1px solid var(--hairline);
+    background: var(--surface);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   BUTTONS
+   BOTONES
    ═══════════════════════════════════════════════════════════════════ */
 .glass-btn-icon {
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.7);
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    color: var(--ink-soft);
     width: 44px;
     height: 44px;
-    border-radius: 14px;
+    border-radius: 999px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
+    box-shadow: var(--shadow-flat);
     transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .glass-btn-icon:hover {
-    background: var(--brand-accent);
-    color: white;
-    transform: scale(1.08);
-    box-shadow: 0 8px 24px var(--brand-glow);
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--paper);
+    transform: scale(1.06);
+    box-shadow: var(--shadow-glow);
 }
 
-/* Primary Button — Luxury with Glow */
+/* Botón primario — tinta sólida, pastilla editorial */
 .btn-luxury {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    color: rgba(255, 255, 255, 0.9);
-    padding: 1.2rem 3rem;
-    border-radius: 16px;
+    background: var(--ink);
+    border: 1px solid var(--ink);
+    color: var(--paper);
+    padding: 1.1rem 2.75rem;
+    border-radius: 999px;
     font-family: 'Inter', sans-serif;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.15em;
-    font-size: 0.8125rem;
+    letter-spacing: 0.18em;
+    font-size: 0.75rem;
     position: relative;
     overflow: hidden;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-    transition: all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+    box-shadow: var(--shadow-elite);
+    transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
     cursor: pointer;
 }
 
@@ -275,44 +382,41 @@ h1.font-bold {
     content: "";
     position: absolute;
     inset: 0;
-    background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.1), transparent);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.14), transparent);
     transform: translateX(-100%);
     transition: transform 0.8s ease;
 }
 
 .btn-luxury:hover {
-    transform: translateY(-3px) scale(1.03);
-    border-color: rgba(59, 130, 246, 0.4);
-    box-shadow:
-        0 0 30px rgba(59, 130, 246, 0.25),
-        0 15px 40px rgba(0, 0, 0, 0.4),
-        inset 0 1px 0 rgba(255, 255, 255, 0.1);
-    background: rgba(59, 130, 246, 0.1);
+    transform: translateY(-2px);
+    background: var(--brand-accent);
+    border-color: var(--brand-accent);
+    box-shadow: var(--shadow-glow), var(--shadow-floating);
 }
 
 .btn-luxury:hover::before {
     transform: translateX(100%);
 }
 
+/* Botón secundario — contorno de tinta */
 .btn-luxury-outline {
     background: transparent;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    color: rgba(255, 255, 255, 0.8);
-    padding: 1rem 2.5rem;
-    border-radius: 14px;
+    border: 1px solid var(--ink);
+    color: var(--ink);
+    padding: 0.9rem 2.25rem;
+    border-radius: 999px;
     font-weight: 600;
-    font-size: 0.8125rem;
+    font-size: 0.75rem;
     text-transform: uppercase;
-    letter-spacing: 0.1em;
-    transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+    letter-spacing: 0.14em;
+    transition: all 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
     cursor: pointer;
 }
 
 .btn-luxury-outline:hover {
-    background: var(--brand-accent);
-    color: white;
-    border-color: var(--brand-accent);
-    box-shadow: 0 8px 30px var(--brand-glow);
+    background: var(--ink);
+    color: var(--paper);
+    box-shadow: var(--shadow-elite);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -321,7 +425,7 @@ h1.font-bold {
 #luxury-preloader {
     position: fixed;
     inset: 0;
-    background-color: var(--midnight-base);
+    background-color: var(--paper);
     z-index: 99999;
     display: flex;
     flex-direction: column;
@@ -331,35 +435,23 @@ h1.font-bold {
 }
 
 .loader-brand {
-    font-family: 'Inter', sans-serif;
-    font-weight: 200;
-    color: rgba(255, 255, 255, 0.6);
-    font-size: 1.5rem;
-    letter-spacing: 0.5em;
-    text-transform: uppercase;
-    animation: pulse-glow 2s ease-in-out infinite alternate;
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 480;
+    font-style: italic;
+    color: var(--ink);
+    font-size: 1.75rem;
+    letter-spacing: 0.02em;
+    animation: pulse-soft 2s ease-in-out infinite alternate;
     margin-bottom: 2.5rem;
 }
 
-/* Text lift for grain readability */
-.text-lift {
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-}
-
-@keyframes pulse-glow {
-    0% {
-        opacity: 0.5;
-        /* Changed from 0.4 to 0.5 */
-    }
-
-    100% {
-        opacity: 0.8;
-        text-shadow: 0 0 40px var(--brand-glow);
-    }
+@keyframes pulse-soft {
+    0% { opacity: 0.45; }
+    100% { opacity: 1; }
 }
 
 .loader-brand-spinner {
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--hairline-strong);
     border-top: 1px solid var(--brand-accent);
     border-radius: 50%;
     width: 40px;
@@ -368,32 +460,26 @@ h1.font-bold {
 }
 
 @keyframes luxury-spin {
-    to {
-        transform: rotate(360deg);
-    }
+    to { transform: rotate(360deg); }
 }
 
 .icon-glow {
-    filter: drop-shadow(0 0 8px var(--brand-glow));
-    transition: filter 0.3s ease;
-}
-
-.icon-glow:hover {
-    filter: drop-shadow(0 0 15px var(--brand-accent));
+    filter: none;
+    transition: color 0.3s ease;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   DROPDOWN
+   DROPDOWN DE CIUDADES
    ═══════════════════════════════════════════════════════════════════ */
 #city-dropdown {
     opacity: 0;
     visibility: hidden;
-    transform: translateY(10px) scale(0.98);
-    transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+    transform: translateY(8px) scale(0.99);
+    transition: all 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
     pointer-events: none;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(24px) saturate(180%);
-    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    box-shadow: var(--shadow-floating);
 }
 
 #city-dropdown.open {
@@ -403,8 +489,46 @@ h1.font-bold {
     pointer-events: auto;
 }
 
+/* Caja de búsqueda del combobox de ciudades */
+.city-search-box {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    padding: 0.75rem;
+    background: var(--surface);
+    border-bottom: 1px solid var(--hairline);
+}
+
+.city-search-input {
+    width: 100%;
+    background: var(--paper);
+    border: 1px solid var(--hairline);
+    border-radius: 12px;
+    padding: 0.6rem 0.9rem;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.875rem;
+    color: var(--ink);
+    outline: none;
+    transition: border-color 0.25s ease;
+}
+
+.city-search-input::placeholder {
+    color: var(--ink-faint);
+}
+
+.city-search-input:focus {
+    border-color: var(--brand-accent);
+}
+
+.search-hint {
+    padding: 1rem;
+    text-align: center;
+    color: var(--ink-faint);
+    font-size: 0.75rem;
+}
+
 .dropdown-item {
-    transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+    transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
     position: relative;
 }
 
@@ -416,7 +540,7 @@ h1.font-bold {
     height: 100%;
     width: 0;
     background-color: var(--brand-accent);
-    transition: width 0.3s ease;
+    transition: width 0.25s ease;
 }
 
 .dropdown-item:hover::before,
@@ -428,38 +552,36 @@ h1.font-bold {
 .dropdown-item:hover,
 .dropdown-item.selected,
 .dropdown-item.highlighted {
-    background: rgba(255, 255, 255, 0.04);
-    padding-left: 2rem;
+    background: var(--paper);
+    padding-left: 1.75rem;
 }
 
 .dropdown-item .city-name {
-    letter-spacing: -0.02em;
+    letter-spacing: -0.01em;
 }
 
 .dropdown-item.selected .city-name {
     color: var(--brand-accent);
-    font-weight: 700;
+    font-weight: 600;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   OFFER CARD (Dark Glass)
+   OFERTA (banner editorial)
    ═══════════════════════════════════════════════════════════════════ */
 .offer-card {
     position: relative;
     overflow: hidden;
-    border-radius: 1.25rem;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: var(--glass-bg);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
-    box-shadow: var(--shadow-elite);
+    border-radius: 1.5rem;
+    border: 1px solid var(--hairline);
+    background: var(--ink);
+    box-shadow: var(--shadow-floating);
     transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+    color: #fff;
 }
 
 .offer-card:hover {
-    border-color: rgba(255, 255, 255, 0.15);
-    box-shadow: var(--shadow-floating);
     transform: translateY(-4px);
+    box-shadow: var(--shadow-floating), var(--shadow-glow);
 }
 
 .offer-card-bg {
@@ -469,27 +591,25 @@ h1.font-bold {
     height: 100%;
     object-fit: cover;
     z-index: 0;
-    opacity: 0.2;
-    filter: saturate(0.6);
+    opacity: 0.45;
+    filter: saturate(0.75);
     transition: transform 3s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.5s ease;
     transform-origin: center;
 }
 
 .offer-card:hover .offer-card-bg {
-    transform: scale(1.06);
-    opacity: 0.3;
+    transform: scale(1.05);
+    opacity: 0.55;
 }
 
 .offer-card-overlay {
     position: absolute;
     inset: 0;
     z-index: 1;
-    background: linear-gradient(135deg,
-            rgba(15, 23, 42, 0.9) 0%,
-            rgba(15, 23, 42, 0.7) 50%,
-            rgba(15, 23, 42, 0.5) 100%);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    background: linear-gradient(115deg,
+            rgba(13, 15, 20, 0.92) 0%,
+            rgba(13, 15, 20, 0.72) 55%,
+            rgba(13, 15, 20, 0.45) 100%);
 }
 
 .offer-card-content {
@@ -497,25 +617,34 @@ h1.font-bold {
     z-index: 10;
 }
 
+/* Botón invertido dentro de la oferta (fondo tinta) */
+.offer-card .btn-luxury {
+    background: var(--paper);
+    border-color: var(--paper);
+    color: var(--ink);
+}
+
+.offer-card .btn-luxury:hover {
+    background: var(--brand-accent);
+    border-color: var(--brand-accent);
+    color: #fff;
+}
+
 /* ═══════════════════════════════════════════════════════════════════
-   TOAST (Dark Glass)
+   TOASTS
    ═══════════════════════════════════════════════════════════════════ */
 .toast {
-    background: rgba(15, 23, 42, 0.85);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--surface);
+    border: 1px solid var(--hairline);
     border-left: 3px solid var(--brand-accent);
-    color: rgba(255, 255, 255, 0.9);
+    color: var(--ink);
     padding: 1rem 1.5rem;
     border-radius: 14px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+    box-shadow: var(--shadow-floating);
     display: flex;
     align-items: center;
     gap: 0.75rem;
     min-width: 300px;
-    transform: translateX(120%);
-    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     font-family: 'Inter', sans-serif;
     font-size: 0.8125rem;
     pointer-events: auto;
@@ -523,6 +652,36 @@ h1.font-bold {
 
 .toast i {
     color: var(--brand-accent);
+}
+
+.toast-success { border-left-color: #16A34A; }
+.toast-success i { color: #16A34A; }
+.toast-error { border-left-color: #DC2626; }
+.toast-error i { color: #DC2626; }
+.toast-warning { border-left-color: #D97706; }
+.toast-warning i { color: #D97706; }
+
+/* Botón de acción dentro de un toast (p.ej. "Recargar" en updates del SW) */
+.toast-action {
+    margin-left: auto;
+    background: var(--ink);
+    color: var(--paper);
+    border: none;
+    border-radius: 999px;
+    padding: 0.45rem 1rem;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.25s ease;
+}
+
+.toast-action:hover {
+    background: var(--brand-accent);
+    color: #fff;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -533,43 +692,37 @@ h1.font-bold {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   SKELETON SCREENS (Dark Shimmer)
+   SKELETON SCREENS (shimmer claro)
    ═══════════════════════════════════════════════════════════════════ */
 .skeleton-bone {
     background: linear-gradient(90deg,
-            rgba(255, 255, 255, 0.03) 25%,
-            rgba(255, 255, 255, 0.08) 37%,
-            rgba(255, 255, 255, 0.03) 63%);
+            var(--skeleton-a) 25%,
+            var(--skeleton-b) 37%,
+            var(--skeleton-a) 63%);
     background-size: 400% 100%;
     animation: skeleton-shimmer 1.4s ease infinite;
     border-radius: 8px;
 }
 
 @keyframes skeleton-shimmer {
-    0% {
-        background-position: 100% 50%;
-    }
-
-    100% {
-        background-position: 0% 50%;
-    }
+    0% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
 }
 
 .skeleton-layer {
     transition: opacity 0.4s ease;
+    background: var(--surface);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   LEAFLET MAP (Dark Integration)
+   LEAFLET (popup claro)
    ═══════════════════════════════════════════════════════════════════ */
 .leaflet-popup-content-wrapper,
 .leaflet-popup-tip {
-    background: rgba(15, 23, 42, 0.92) !important;
-    color: rgba(255, 255, 255, 0.9) !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5) !important;
+    background: var(--surface) !important;
+    color: var(--ink) !important;
+    border: 1px solid var(--hairline) !important;
+    box-shadow: var(--shadow-floating) !important;
 }
 
 .leaflet-container a.leaflet-popup-close-button {
@@ -577,10 +730,58 @@ h1.font-bold {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   RESPONSIVE
+   FILAS DEL PRONÓSTICO SEMANAL
+   ═══════════════════════════════════════════════════════════════════ */
+.forecast-row-3d {
+    background-color: transparent;
+    border-bottom: 1px solid var(--hairline);
+    border-radius: 0 !important;
+    transition: background-color 0.3s ease, transform 0.3s ease;
+}
+
+.forecast-row-3d:last-child {
+    border-bottom: none;
+}
+
+.forecast-row-3d:hover {
+    background-color: var(--paper);
+    transform: translateX(4px);
+}
+
+/* Bloque de fecha en cada fila */
+.date-block {
+    font-family: 'Fraunces', Georgia, serif;
+    font-feature-settings: 'tnum';
+    border: 1px solid var(--hairline);
+    background: var(--surface);
+}
+
+.forecast-row-3d:hover .date-block {
+    border-color: var(--brand-accent);
+    color: var(--brand-accent);
+}
+
+/* Barra térmica — pista clara, líquido de acento */
+.liquid-thermo-container {
+    background: var(--paper-deep);
+    border: 1px solid var(--hairline) !important;
+    box-shadow: inset 0 1px 3px rgba(23, 25, 30, 0.08) !important;
+}
+
+.liquid-thermo-bar {
+    box-shadow: 0 1px 4px rgba(23, 25, 30, 0.2);
+}
+
+.liquid-flare {
+    opacity: 0.85;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.5) 100%);
+    box-shadow: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   RESPONSIVE / ESTADOS
    ═══════════════════════════════════════════════════════════════════ */
 @media (max-width: 640px) {
-
     #map,
     #chart-container {
         height: 250px;
@@ -591,26 +792,12 @@ h1.font-bold {
     }
 }
 
-/* Modal Open State */
 body.modal-open {
     overflow: hidden;
 }
 
-/* Empty State Card */
-.empty-state-card {
-    background: var(--glass-bg);
-    border: 1px dashed rgba(255, 255, 255, 0.1);
-    border-radius: 1.25rem;
-    transition: all 0.3s ease;
-}
-
-.empty-state-card:hover {
-    border-color: var(--brand-accent);
-    border-style: solid;
-}
-
 /* ═══════════════════════════════════════════════════════════════════
-   ANIMATED WEATHER ICONS (SVG)
+   ICONOS DE CLIMA ANIMADOS
    ═══════════════════════════════════════════════════════════════════ */
 .weather-icon-animated {
     display: inline-flex;
@@ -623,144 +810,100 @@ body.modal-open {
     height: 100% !important;
 }
 
-/* Sun rotation */
-@keyframes sun-spin {
-    from {
-        transform: rotate(0deg);
-    }
-
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-/* Rain drops */
-@keyframes rain-fall {
-    0% {
-        transform: translateY(-4px);
-        opacity: 0;
-    }
-
-    50% {
-        opacity: 1;
-    }
-
-    100% {
-        transform: translateY(4px);
-        opacity: 0;
-    }
-}
-
-/* Snow float */
-@keyframes snow-float {
-    0% {
-        transform: translateY(-2px) rotate(0deg);
-    }
-
-    50% {
-        transform: translateY(2px) rotate(180deg);
-    }
-
-    100% {
-        transform: translateY(-2px) rotate(360deg);
-    }
-}
-
-/* Cloud drift */
-@keyframes cloud-drift {
-    0% {
-        transform: translateX(-2px);
-    }
-
-    50% {
-        transform: translateX(2px);
-    }
-
-    100% {
-        transform: translateX(-2px);
-    }
-}
-
-/* Glassmorphism List Row Hover Extension (V4) */
-.row-hover-glass {
-    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-    position: relative;
-    overflow: hidden;
-}
-
-.row-hover-glass::before {
-    content: '';
+/* Disco de acento tras el icono principal */
+.icon-disc {
     position: absolute;
-    inset: 0;
-    border: 1px solid rgba(255, 255, 255, 0);
-    border-radius: 0.75rem;
-    /* rounded-xl */
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 100%);
-    opacity: 0;
-    transition: opacity 0.4s ease, border-color 0.4s ease;
-    z-index: -1;
-    pointer-events: none;
+    inset: 8%;
+    border-radius: 999px;
+    background: var(--brand-dim);
+    border: 1px solid var(--hairline);
+    transition: background 0.8s ease;
 }
 
-.row-hover-glass:hover::before {
-    opacity: 1;
-    border-color: rgba(255, 255, 255, 0.15);
+/* ═══════════════════════════════════════════════
+   Mapa expandido a pantalla completa
+   (activado por #map-expand-btn en app.js)
+   ═══════════════════════════════════════════════ */
+#map-wrapper.map-expanded {
+    position: fixed;
+    inset: 1rem;
+    z-index: 1000;
+    height: auto;
+    transition: none;
 }
 
-.row-hover-glass:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
-    background-color: rgba(255, 255, 255, 0.03);
+@media (min-width: 768px) {
+    #map-wrapper.map-expanded {
+        inset: 2rem;
+    }
+}
+
+/* ── Utilidad: ocultar scrollbar manteniendo el scroll ────────────── */
+.no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   ULTRA-REALISTIC 3D FORECAST (PRÓXIMA SEMANA)
+   MOVIMIENTO REDUCIDO (WCAG 2.3.3)
+   Anula animaciones y transiciones CSS; los tweens GSAP se aceleran
+   vía globalTimeline.timeScale en app.js y los bucles infinitos se
+   omiten en su punto de creación.
    ═══════════════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
 
-/* Volumetric Row Container */
-.forecast-row-3d {
-    background-color: transparent;
-    border: 1px solid rgba(255, 255, 255, 0);
-    box-shadow:
-        0 4px 6px -1px rgba(0, 0, 0, 0.1),
-        0 2px 4px -1px rgba(0, 0, 0, 0.06),
-        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    #mesh-bg {
+        animation: none !important;
+    }
 }
 
-.forecast-row-3d:hover {
-    border-color: rgba(255, 255, 255, 0.1);
-    box-shadow:
-        0 20px 25px -5px rgba(0, 0, 0, 0.5),
-        0 10px 10px -5px rgba(0, 0, 0, 0.3),
-        inset 0 1px 0 rgba(255, 255, 255, 0.2),
-        inset 0 -1px 0 rgba(0, 0, 0, 0.5);
-    transform: translateY(-4px) scale(1.01);
-}
+/* ═══════════════════════════════════════════════════════════════════
+   IMPRESIÓN DEL ITINERARIO ("Guardar Plan" → PDF real del navegador)
+   Se activa con body.print-itinerary desde app.js antes de print().
+   ═══════════════════════════════════════════════════════════════════ */
+@media print {
+    body.print-itinerary * {
+        visibility: hidden;
+    }
 
-/* Deep Glass Thermo Container */
-.liquid-thermo-container {
-    /* Create depth */
-    box-shadow:
-        inset 0 3px 6px rgba(0, 0, 0, 0.8),
-        inset 0 0 4px rgba(0, 0, 0, 0.9),
-        0 1px 1px rgba(255, 255, 255, 0.08);
-    /* Bottom highlight to define the edge */
-    background: #050a14;
-}
+    body.print-itinerary #modal-content,
+    body.print-itinerary #modal-content * {
+        visibility: visible;
+    }
 
-/* The neon bar itself */
-.liquid-thermo-bar {
-    /* Base shadow for the neon tube */
-    box-shadow:
-        inset 0 -1px 2px rgba(0, 0, 0, 0.8),
-        inset 0 1px 1px rgba(255, 255, 255, 0.4),
-        0 0 8px currentColor;
-    /* Spreads the light based on the gradient color indirectly via opacity, but handled strictly via tailwind drop-shadow/blur below */
-}
+    body.print-itinerary #modal-content {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        max-height: none;
+        overflow: visible;
+        transform: none !important;
+        opacity: 1 !important;
+        box-shadow: none;
+        border: none;
+        border-radius: 0;
+        padding: 0;
+        background: #fff;
+        color: #000;
+    }
 
-/* Specular highlight on the bar */
-.liquid-flare {
-    opacity: 0.9;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.4) 100%);
-    box-shadow: -2px 0 4px rgba(255, 255, 255, 0.8);
+    /* Sin controles interactivos en papel */
+    body.print-itinerary #close-modal,
+    body.print-itinerary #save-itinerary {
+        display: none !important;
+    }
 }

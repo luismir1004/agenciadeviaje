@@ -1,19 +1,19 @@
-rise<p align="center">
+<p align="center">
   <img src="icons/icon-512x512.svg" alt="NextGen Europa" width="120" />
 </p>
 
 <h1 align="center">NextGen Europa — Weather SPA</h1>
 
 <p align="center">
-  <em>Enterp-grade weather forecast application for European business travelers.</em><br>
+  <em>Enterprise-grade weather forecast application for European business travelers.</em><br>
   <strong>Vanilla JS · OOP · PWA · Offline-First</strong>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/JavaScript-ES6+-F7DF1E?logo=javascript&logoColor=black" alt="JavaScript">
-  <img src="https://img.shields.io/badge/TailwindCSS-CDN-06B6D4?logo=tailwindcss" alt="TailwindCSS">
+  <img src="https://img.shields.io/badge/TailwindCSS-Compilado-06B6D4?logo=tailwindcss" alt="TailwindCSS">
   <img src="https://img.shields.io/badge/GSAP-3.12-88CE02?logo=greensock" alt="GSAP">
-  <img src="https://img.shields.io/badge/Chart.js-4.x-FF6384?logo=chartdotjs" alt="Chart.js">
+  <img src="https://img.shields.io/badge/Chart.js-4.4-FF6384?logo=chartdotjs" alt="Chart.js">
   <img src="https://img.shields.io/badge/Leaflet-1.9-199900?logo=leaflet" alt="Leaflet">
   <img src="https://img.shields.io/badge/PWA-Installable-5A0FC8?logo=pwa" alt="PWA">
 </p>
@@ -37,20 +37,25 @@ rise<p align="center">
 
 ## Visión General
 
-NextGen Europa es una **Single Page Application** que ofrece pronósticos meteorológicos de 7 días para las principales capitales europeas. Diseñada con una estética **"Executive Swiss"** (minimalismo corporativo de alto contraste), la aplicación combina datos en tiempo real de la API de 7Timer con una experiencia inmersiva de nivel premium.
+NextGen Europa es una **Single Page Application** que ofrece pronósticos meteorológicos de 7 días para las principales capitales europeas. Diseñada con el sistema **"Meridian Editorial"** (papel y tinta, tipografía display Fraunces, retícula suiza de líneas finas y acentos dinámicos según el clima), la aplicación combina datos en tiempo real de la API de 7Timer con una experiencia de lectura tipo revista de viajes.
 
 ### Características Principales
 
 | Feature | Descripción |
 |---|---|
-| **Pronóstico Extendido** | 7 días con temperaturas máx/mín y código climático |
-| **Motor de Temas Dinámicos** | La paleta de colores muta según el clima dominante |
+| **Pronóstico Extendido** | 7 días con temperaturas máx/mín, viento y código climático |
+| **Buscador Global** | Cualquier ciudad del mundo vía Open-Meteo Geocoding (búsqueda con debounce en el selector) |
+| **Modo Oscuro** | `prefers-color-scheme` completo: tokens, gráfico, mapa (tiles dark) y acentos AA por tema |
+| **Motor de Temas Dinámicos** | El color de acento (tipografía, gráfico, fondos) muta según el clima dominante |
 | **Chart Pro** | Gráfico con tooltips climáticos y anotaciones min/max |
-| **Mapa Satelital** | Leaflet.js con tiles CARTO Dark y animaciones `flyTo` |
+| **Mapa Satelital** | Leaflet.js con tiles CARTO Light y animaciones `flyTo` |
 | **Sesión Persistente** | La última ciudad seleccionada se restaura al recargar |
 | **PWA Instalable** | Funciona offline con 4 estrategias de caching |
 | **Feedback Háptico** | Micro-sonido via Web Audio API al cambiar de ciudad |
-| **Itinerario IA** | Generador automático de planes diarios según clima |
+| **Itinerario Inteligente** | Generador de planes diarios según clima (simulación basada en reglas, no un LLM) |
+| **Geolocalización** | Pronóstico de tu ubicación actual bajo demanda (botón dedicado) |
+
+> **Datos:** Open-Meteo es la API primaria (probabilidad de precipitación y viento reales); 7Timer actúa como fallback con reintentos exponenciales, e IndexedDB como último recurso offline.
 
 ---
 
@@ -66,7 +71,7 @@ La aplicación sigue un principio estricto de **Separación de Responsabilidades
                     └──────┬───────┘
                            │
                     ┌──────▼───────┐
-                    │   app.js     │  ← Controlador principal (850+ LOC)
+                    │   app.js     │  ← Controlador principal (~1300 LOC)
                     │  WeatherApp  │     Event delegation, HTTP client,
                     └──────┬───────┘     Data parser, DOM renderer
                            │
@@ -93,9 +98,11 @@ La aplicación sigue un principio estricto de **Separación de Responsabilidades
 |---|---|
 | **Single Responsibility** | Cada clase tiene un único dominio (UI, Chart, Cache, etc.) |
 | **Campos Privados** | `#field` protege estado interno de mutación externa |
-| **Inmutabilidad** | `Config.js` con `Object.freeze()` recursivo |
+| **Inmutabilidad** | `Config.js` con deep-freeze recursivo real (`deepFreeze()`) |
 | **Fail Gracefully** | Fallbacks en parser, cache, y red sin romper UX |
-| **Zero Dependencies** | Solo Vanilla JS (ES6+), sin frameworks ni bundlers runtime |
+| **Sin Frameworks** | Vanilla JS (ES Modules nativos) sin frameworks runtime; librerías self-hosted en `vendor/` con versiones exactas fijadas en package.json |
+| **Seguridad** | CSP estricta (`script-src 'self'` — cero orígenes de script externos), sanitización de datos externos |
+| **Testeado** | 23 tests unitarios (parser, sanitize, cache) + 12 e2e en Chromium (`npm test`) |
 
 ---
 
@@ -107,17 +114,19 @@ La aplicación sigue un principio estricto de **Separación de Responsabilidades
 |---|---|---|
 | **Vanilla JavaScript** | ES6+ | Lógica de aplicación, OOP, `async/await` |
 | **HTML5 Semántico** | — | Estructura accesible con `aria-*` labels |
-| **Tailwind CSS** | CDN | Utility classes para layout responsivo |
+| **Tailwind CSS** | 3.4 (compilado) | Utility classes; `tailwind-dist.css` se genera con `npm run build:css` |
 | **CSS Custom Properties** | — | Design System con variables dinámicas |
 
-### Librerías Externas (CDN)
+### Librerías (self-hosted en `vendor/`)
 
 | Librería | Rol en la App |
 |---|---|
 | **GSAP 3.12** | Timelines cinematográficas: staggered reveals, `flyTo` de backgrounds, morphing de opacidad. Coordina el preloader → hero entrance con una cadena de `gsap.fromTo()` sincronizados. |
 | **Chart.js 4.x** | Canvas de temperatura con un **plugin custom de anotaciones** pintado directamente en el canvas (`afterDatasetsDraw`). Tooltips extendidos muestran descripción climática y amplitud térmica. |
-| **Leaflet.js 1.9** | Mapa satelital con tiles CARTO Dark. Animaciones `flyTo()` con zoom dinámico al cambiar de ciudad. Popups info con coordenadas. |
+| **Leaflet.js 1.9** | Mapa satelital con tiles CARTO Light. Animaciones `flyTo()` con zoom dinámico al cambiar de ciudad. Popups info con coordenadas. |
 | **FontAwesome 6.4** | Sistema de iconografía climática (☀️→`fa-sun`, 🌧→`fa-cloud-rain`). |
+
+> Todas las librerías y tipografías son **self-hosted** (`vendor/` y `fonts/`, versiones exactas de npm): sin CDNs de terceros, la CSP queda en `script-src 'self'` y el único origen externo restante son las imágenes (Unsplash/CARTO) y las APIs meteorológicas.
 
 ### APIs Nativas del Navegador
 
@@ -125,9 +134,10 @@ La aplicación sigue un principio estricto de **Separación de Responsabilidades
 |---|---|
 | **Web Audio API** | Haptic click (oscilador sine 1800Hz, 20ms) al cambiar de ciudad |
 | **IntersectionObserver** | Lazy initialization del mapa y chart |
-| **AbortController** | Cancelación de peticiones HTTP concurrentes |
-| **Geolocation API** | Detección automática de ubicación del usuario |
+| **AbortController** | Cancelación de peticiones HTTP concurrentes (incluida geolocalización) |
+| **Geolocation API** | Ubicación del usuario bajo demanda (botón, nunca automática) |
 | **LocalStorage** | Cache con TTL + persistencia de sesión |
+| **IndexedDB (localforage)** | Persistencia de forecasts para modo offline real |
 
 ---
 
@@ -262,7 +272,7 @@ Al recargar, la app restaura la última ciudad desde `localStorage`, ofreciendo 
 
 ### Registro de SW No Bloqueante
 
-El Service Worker se registra vía `requestIdleCallback` **después** del evento `load`, garantizando que nunca compita con el **Largest Contentful Paint** (LCP) del preloader/hero.
+El Service Worker se registra al final de `app.js` vía `requestIdleCallback` **después** del evento `load`, garantizando que nunca compita con el **Largest Contentful Paint** (LCP) del preloader/hero.
 
 ---
 
@@ -272,7 +282,8 @@ El Service Worker se registra vía `requestIdleCallback` **después** del evento
 
 | Tipo de Recurso | Estrategia | Justificación |
 |---|---|---|
-| App Shell (HTML, CSS, JS) | **Cache First** | Carga instantánea en revisitas |
+| Navegaciones (HTML) | **Network First** → Cache → Offline | El documento llega siempre fresco |
+| App Shell (CSS, JS, iconos) | **Stale-While-Revalidate** | Rápido en revisitas + los deploys llegan solos |
 | CDN (Fonts, FA, GSAP, Chart.js) | **Stale-While-Revalidate** | Respuesta rápida + update en background |
 | API (7Timer) | **Network First** → Cache → Offline | Datos frescos cuando hay red |
 | Imágenes (Unsplash) | **Cache First** | Contenido inmutable por hash |
@@ -299,20 +310,28 @@ Compatible con **Add to Home Screen** en Android e **iOS Safari**.
 
 ```
 weather-spa/
-├── index.html              # Entry-point semántico + CDN deps
-├── app.js                  # Controlador WeatherApp (~850 LOC)
-├── styles.css              # Design System Executive Swiss
-├── manifest.json           # PWA manifest (standalone, icons)
+├── index.html              # Entry-point semántico + CDN deps (SRI) + CSP
+├── app.js                  # Controlador WeatherApp + registro del SW
+├── styles.css              # Design System Meridian Editorial (papel/tinta)
+├── input.css / tailwind.config.js  # Fuente de Tailwind (build:css)
+├── tailwind-dist.css       # Tailwind compilado (commiteado para deploy estático)
+├── build.js                # Minificación (Terser + clean-css) → /dist
+├── manifest.json           # PWA manifest (standalone, icons PNG+SVG)
 ├── service-worker.js       # SW con 4 estrategias de caching
-├── offline.html            # Fallback offline autocontenido
-├── package.json            # Vite dev server
+├── offline.html            # Fallback offline 100% autocontenido
+├── package.json            # Vite dev server + scripts de build
+│
+├── data/
+│   └── deals.json          # Ofertas dinámicas por ciudad
 │
 ├── icons/
-│   ├── icon-192x192.svg    # PWA icon (compass rose)
-│   └── icon-512x512.svg    # PWA icon (detailed)
+│   ├── icon-192x192.svg / .png       # PWA icon (compass rose)
+│   ├── icon-512x512.svg / .png       # PWA icon (detailed)
+│   ├── icon-512x512-maskable.png     # Maskable (safe zone 80%)
+│   └── apple-touch-icon.png          # iOS home screen
 │
 └── services/
-    ├── Config.js            # Constantes frozen (ciudades, API, temas)
+    ├── Config.js            # Constantes deep-frozen (ciudades, API, temas)
     ├── CacheManager.js      # LocalStorage con TTL + sesión
     ├── ChartManager.js      # Chart Pro (tooltips + anotaciones)
     ├── HeroManager.js       # Animaciones GSAP + Image Pool
@@ -342,6 +361,9 @@ npm install
 
 # Iniciar servidor de desarrollo
 npm run dev
+
+# Ejecutar la suite e2e (Chromium headless, API stubbeada)
+npm test
 ```
 
 La app estará disponible en `http://localhost:5173`.
